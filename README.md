@@ -13,8 +13,10 @@ Bio-Nutrient Manager helps users make science-based decisions about their dietar
 - **Medical Onboarding** -- Describe your symptoms in English or Chinese. DeepSeek standardizes them into ATC-coded conditions with evidence-backed supplement recommendations.
 - **Supplement Label OCR** -- Photograph a supplement nutrition label. MIMO v2.5 Pro extracts all ingredients. Supports Chinese, English, French, German, Italian, and Spanish labels.
 - **Smart Scheduling** -- Hardcoded rule engine allocates supplements to four daily time slots (morning empty-stomach, with-meal, after-lunch, before-bed) based on absorption kinetics, nutrient interactions, and clinical context.
-- **UL Safety Warnings** -- Total daily intake is compared against Tolerable Upper Intake Levels from US and Japan standards. Exceeding UL triggers a critical alert.
-- **Inventory Tracking** -- Track remaining pills, get low-stock alerts at 30 and 7 days. Shared supplement catalog across all users.
+- **Unit-Safe UL Safety Warnings** -- Total daily intake is normalized across IU, mcg, mg, and g before comparison against Tolerable Upper Intake Levels. Exceeding UL triggers a critical alert.
+- **Bioavailability-Aware Progress** -- Tracks supplement forms such as magnesium oxide/glycinate, calcium carbonate/citrate, curcumin phytosome/piperine, B12 forms, and folate forms. Dashboard separates label dose from estimated effective intake.
+- **Personalized Absorption Signals** -- Uses onboarding context such as age, GI conditions, low-stomach-acid/PPI signals, metformin, plant-based diet, and MTHFR mentions to surface absorption caveats.
+- **Inventory Forecasting** -- Track remaining pills, get low-stock alerts at 30 and 7 days, and estimate depletion from recent consumption history. Shared supplement catalog across all users.
 - **Hierarchical ATC Taxonomy** -- SMI-inspired parent-node anchoring handles rare diseases and long-tail conditions. Unknown ATC codes inherit supplement mappings from their nearest known ancestors.
 - **Cross-Validation** -- Every AI recommendation is cross-checked against hardcoded nutrient standards, interaction rules, and clinical context patterns before reaching the user.
 - **Bilingual** -- Full Chinese/English UI with language toggle. Chinese and English symptom input. Chinese supplement label OCR.
@@ -98,6 +100,7 @@ Open `http://localhost:3000` in a browser. Register an account, complete your he
 | POST | /api/dashboard/check | JWT | Mark dose consumed |
 | POST | /api/dashboard/undo | JWT | Undo dose consumption |
 | POST | /api/dashboard/skip | JWT | Skip today's dose |
+| POST | /api/dashboard/alerts/:id/ack | JWT | Acknowledge a persisted alert |
 | POST | /api/supplements/import | JWT | OCR import supplement label |
 | POST | /api/ocr | JWT | Alias for OCR import |
 | GET | /api/inventory | JWT | List user inventory |

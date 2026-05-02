@@ -69,8 +69,11 @@ function resolve(elementName, unit) {
     'omega-3': 'Omega-3 (EPA+DHA)', 'coq10': 'Coenzyme Q10 (CoQ10)',
     'coq 10': 'Coenzyme Q10 (CoQ10)', 'nac': 'NAC (N-Acetyl Cysteine)',
     'ala': 'Alpha-Lipoic Acid', 'b12': 'Vitamin B12 (Cobalamin)',
-    'b6': 'Vitamin B6', 'folate': 'Vitamin B9 (Folate)',
-    'folic acid': 'Vitamin B9 (Folate)',
+    'vitamin b12': 'Vitamin B12 (Cobalamin)', 'cobalamin': 'Vitamin B12 (Cobalamin)',
+    'riboflavin': 'Vitamin B2 (Riboflavin)', 'riboflavin (b2)': 'Vitamin B2 (Riboflavin)',
+    'b2': 'Vitamin B2 (Riboflavin)', 'b6': 'Vitamin B6',
+    'folate': 'Vitamin B9 (Folate)', 'folic acid': 'Vitamin B9 (Folate)',
+    'folate (vitamin b9)': 'Vitamin B9 (Folate)',
     // Chinese aliases
     '维生素d': 'Vitamin D3', '维生素d3': 'Vitamin D3', '维d': 'Vitamin D3',
     '维生素c': 'Vitamin C', '维c': 'Vitamin C',

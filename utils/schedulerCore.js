@@ -10,7 +10,7 @@
  *      a) Sleep aids → before-bed
  *      b) Energizers → morning-empty
  *      c) Fat-soluble vitamins + fatty-acids → with-meal
- *      d) Ca/Fe conflict: Ca → morning-empty, Fe → after-lunch (absorbed better later)
+ *      d) Ca/Fe conflict: Ca → with-meal, Fe → after-lunch
  *      e) Category 'herbal' → morning-empty (default)
  *      f) Amino acids: energizing → morning-empty, calming → before-bed
  *      g) Minerals (not Ca/Fe) → with-meal or after-lunch
@@ -18,6 +18,9 @@
  */
 
 const { getDb } = require('../config/database');
+const { convert } = require('./unitConverter');
+
+const TIME_ORDER = ['morning-empty', 'with-meal', 'after-lunch', 'before-bed'];
 
 // ---- Element Classification Maps ----
 
@@ -64,6 +67,13 @@ class SchedulerCore {
 
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+    const existingStates = db.prepare(`
+      SELECT inventory_id, time_of_day, consumed
+      FROM daily_schedule
+      WHERE user_id = ? AND scheduled_date = ?
+    `).all(userId, today);
+    const stateByInventory = new Map(existingStates.map(s => [s.inventory_id, s]));
+
     // Clear today's existing schedule for this user (idempotent)
     db.prepare('DELETE FROM daily_schedule WHERE user_id = ? AND scheduled_date = ?').run(userId, today);
 
@@ -86,10 +96,13 @@ class SchedulerCore {
 
       for (const n of nutrients) {
         const en = n.element || n.name;
+        if (!en) continue;
+        const amount = (n.amount_per_serving || n.amount || 0) * item.dosage_per_day;
         if (!elementTotals[en]) {
           elementTotals[en] = { amount: 0, unit: n.unit, rda: null, ul: null, category: 'unclassified' };
         }
-        elementTotals[en].amount += (n.amount_per_serving || n.amount || 0) * item.dosage_per_day;
+        const converted = convert(amount, n.unit, elementTotals[en].unit, en);
+        elementTotals[en].amount += converted.unit === elementTotals[en].unit ? converted.value : amount;
       }
     }
 
@@ -101,6 +114,11 @@ class SchedulerCore {
       ).get(elName);
 
       if (std) {
+        const convertedTotal = convert(total.amount, total.unit, std.unit, elName);
+        if (convertedTotal.unit === std.unit) {
+          total.amount = convertedTotal.value;
+          total.unit = std.unit;
+        }
         total.rda = std.rda;
         total.ul = std.ul;
         total.category = std.category;
@@ -145,15 +163,22 @@ class SchedulerCore {
     // ---- Step 3: Time Allocation per inventory item ----
     const schedule = [];
     const insertSchedule = db.prepare(`
-      INSERT INTO daily_schedule (user_id, inventory_id, time_of_day, dosage, scheduled_date)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO daily_schedule (user_id, inventory_id, time_of_day, dosage, scheduled_date, consumed)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const tx = db.transaction(() => {
+      const assigned = [];
       for (const { item, nutrients } of parsedItems) {
-        const timeOfDay = this._determineTimeOfDay(nutrients, parsedItems, elementCategoryMap);
+        const existingState = stateByInventory.get(item.id);
+        const preferred = this._determineTimeOfDay(nutrients, parsedItems, elementCategoryMap);
+        const timeOfDay = existingState?.consumed
+          ? existingState.time_of_day
+          : this._resolveInteractionConflicts(preferred, nutrients, assigned, interactionRows);
+        const consumed = existingState ? existingState.consumed : 0;
 
-        insertSchedule.run(userId, item.id, timeOfDay, item.dosage_per_day, today);
+        insertSchedule.run(userId, item.id, timeOfDay, item.dosage_per_day, today, consumed);
+        assigned.push({ item, nutrients, timeOfDay });
 
         schedule.push({
           inventory_id: item.id,
@@ -161,18 +186,15 @@ class SchedulerCore {
           time_of_day: timeOfDay,
           dosage: item.dosage_per_day,
           scheduled_date: today,
+          consumed,
         });
       }
     });
     tx();
 
     // ---- Step 4: Insert alerts into DB ----
-    const insertAlert = db.prepare(`
-      INSERT INTO alerts (user_id, inventory_id, alert_type, message)
-      VALUES (?, ?, ?, ?)
-    `);
     for (const a of alerts) {
-      insertAlert.run(userId, a.inventory_id, a.alert_type, a.message);
+      insertAlertOnce(db, userId, a.inventory_id, a.alert_type, a.message);
     }
 
     return { schedule, alerts, totals: elementTotals };
@@ -199,16 +221,18 @@ class SchedulerCore {
     }
 
     // Rule D: Ca/Fe conflict resolution
-    // Calcium in morning (empty stomach, better absorption), iron after lunch
+    // Calcium with food for tolerability; iron later when calcium is present.
     const allLowerNames = new Set();
     for (const { nutrients: nl } of allParsedItems) {
       for (const n of nl) { allLowerNames.add((n.element || n.name || '').toLowerCase()); }
     }
     const hasCalcium = lowerNames.some(e => e.includes('calcium'));
     const hasIron = lowerNames.some(e => e.includes('iron'));
-    if (hasCalcium && hasIron) {
-      if (lowerNames.some(e => e.includes('calcium'))) return 'morning-empty';
-      if (lowerNames.some(e => e.includes('iron'))) return 'after-lunch';
+    const globalHasCalcium = [...allLowerNames].some(e => e.includes('calcium'));
+    const globalHasIron = [...allLowerNames].some(e => e.includes('iron'));
+    if (globalHasCalcium && globalHasIron) {
+      if (hasIron) return 'after-lunch';
+      if (hasCalcium) return 'with-meal';
     }
 
     // Rule E: Calming amino acids -> before-bed
@@ -228,6 +252,31 @@ class SchedulerCore {
     return 'with-meal';
   }
 
+  _resolveInteractionConflicts(preferred, nutrients, assigned, interactionRows) {
+    if (!this._slotHasConflict(preferred, nutrients, assigned, interactionRows)) return preferred;
+
+    for (const slot of TIME_ORDER) {
+      if (!this._slotHasConflict(slot, nutrients, assigned, interactionRows)) return slot;
+    }
+
+    return preferred;
+  }
+
+  _slotHasConflict(slot, nutrients, assigned, interactionRows) {
+    const sameSlot = assigned.filter(a => a.timeOfDay === slot);
+    if (sameSlot.length === 0) return false;
+
+    const names = nutrients.map(n => n.element || n.name || '');
+    for (const other of sameSlot) {
+      const otherNames = other.nutrients.map(n => n.element || n.name || '');
+      for (const ir of interactionRows) {
+        if (!['inhibit', 'toxic', 'caution'].includes(ir.effect)) continue;
+        if (hasPair(names, otherNames, ir.element_a, ir.element_b)) return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Get today's schedule for a user (for dashboard display).
    */
@@ -240,11 +289,14 @@ class SchedulerCore {
       FROM daily_schedule ds
       JOIN inventory i ON ds.inventory_id = i.id
       WHERE ds.user_id = ? AND ds.scheduled_date = ?
+        AND ds.consumed != -1
       ORDER BY
         CASE ds.time_of_day
-          WHEN 'morning' THEN 1
-          WHEN 'noon' THEN 2
-          WHEN 'night' THEN 3
+          WHEN 'morning-empty' THEN 1
+          WHEN 'with-meal' THEN 2
+          WHEN 'after-lunch' THEN 3
+          WHEN 'before-bed' THEN 4
+          ELSE 5
         END
     `).all(userId, today);
   }
@@ -258,3 +310,38 @@ class SchedulerCore {
 }
 
 module.exports = new SchedulerCore();
+
+function hasPair(namesA, namesB, elementA, elementB) {
+  const aInA = containsElement(namesA, elementA);
+  const bInA = containsElement(namesA, elementB);
+  const aInB = containsElement(namesB, elementA);
+  const bInB = containsElement(namesB, elementB);
+  return (aInA && bInB) || (bInA && aInB);
+}
+
+function containsElement(names, needle) {
+  const n = String(needle || '').toLowerCase();
+  if (!n) return false;
+  return names.some(name => {
+    const value = String(name || '').toLowerCase();
+    return value ? value.includes(n) || n.includes(value) : false;
+  });
+}
+
+function insertAlertOnce(db, userId, inventoryId, alertType, message) {
+  const existing = db.prepare(`
+    SELECT id FROM alerts
+    WHERE user_id = ?
+      AND COALESCE(inventory_id, -1) = COALESCE(?, -1)
+      AND alert_type = ?
+      AND message = ?
+      AND date(created_at) = date('now')
+    LIMIT 1
+  `).get(userId, inventoryId, alertType, message);
+
+  if (existing) return;
+  db.prepare(`
+    INSERT INTO alerts (user_id, inventory_id, alert_type, message)
+    VALUES (?, ?, ?, ?)
+  `).run(userId, inventoryId, alertType, message);
+}

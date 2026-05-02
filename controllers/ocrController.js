@@ -17,7 +17,8 @@ const path = require('path');
 const { getDb } = require('../config/database');
 const { mimoVision } = require('../utils/apiReliable');
 const { resolve: resolveElement } = require('../utils/elementResolver');
-const { toCanonical } = require('../utils/unitConverter');
+const { convert, toCanonical, normalizeUnit } = require('../utils/unitConverter');
+const { detectBioavailability } = require('../utils/bioavailability');
 
 const SYSTEM_PROMPT = `You are a supplement label OCR engine. Extract the nutrition facts from the image and return a strict JSON object.
 
@@ -59,30 +60,33 @@ function mockMimoResponse() {
  * Returns { valid: boolean, reason: string|null, severity: 'ok'|'warn'|'critical' }
  */
 function validateNutrient(elementName, amount, unit, db) {
+  const resolved = resolveElement(elementName, unit);
+  const canonicalName = resolved.element_name;
+
   // Find the element in standards
   const std = db.prepare(
     "SELECT * FROM nutrient_standards WHERE element_name = ? AND region = 'US' LIMIT 1"
-  ).get(elementName);
+  ).get(canonicalName);
 
   // Convert to mg for absolute comparison
-  let amountMg = amount;
-  if (unit === 'mcg') amountMg = amount / 1000;
-  if (unit === 'g') amountMg = amount * 1000;
+  const normalizedUnit = normalizeUnit(unit);
+  const asMg = convert(amount, normalizedUnit, 'mg', canonicalName);
+  const amountMg = asMg.unit === 'mg' ? asMg.value : null;
 
   // ABSURD CHECK: > 50g per pill is physically impossible
-  if (amountMg > 50000) {
+  if (amountMg !== null && amountMg > 50000) {
     return {
       valid: false,
-      reason: `${elementName}: ${amount}${unit} per serving is physically impossible (>50g per pill). MIMO may have misread the label.`,
+      reason: `${canonicalName}: ${amount}${unit} per serving is physically impossible (>50g per serving). MIMO may have misread the label.`,
       severity: 'critical',
     };
   }
 
   // ABSURD CHECK: > 10g per pill is extremely suspicious
-  if (amountMg > 10000) {
+  if (amountMg !== null && amountMg > 10000) {
     return {
       valid: false,
-      reason: `${elementName}: ${amount}${unit} per serving is abnormally high (>10g per pill). Please verify the label.`,
+      reason: `${canonicalName}: ${amount}${unit} per serving is abnormally high (>10g per serving). Please verify the label.`,
       severity: 'critical',
     };
   }
@@ -90,23 +94,20 @@ function validateNutrient(elementName, amount, unit, db) {
   if (std) {
     // Has standards — check against UL
     if (std.ul !== null) {
-      // Convert UL to mg for comparison
-      let ulMg = std.ul;
-      if (std.unit === 'mcg') ulMg = std.ul / 1000;
-      if (std.unit === 'g') ulMg = std.ul * 1000;
+      const amountForStd = convert(amount, normalizedUnit, std.unit, canonicalName);
 
-      if (amountMg > ulMg * 3) {
+      if (amountForStd.unit === std.unit && amountForStd.value > std.ul * 3) {
         return {
           valid: false,
-          reason: `${elementName}: ${amount}${unit} per serving exceeds 3× the safe upper limit (UL=${std.ul}${std.unit}). MIMO may have misread mcg as mg.`,
+          reason: `${canonicalName}: ${amount}${unit} per serving exceeds 3x the safe upper limit (UL=${std.ul}${std.unit}). MIMO may have misread the unit.`,
           severity: 'critical',
         };
       }
 
-      if (amountMg > ulMg) {
+      if (amountForStd.unit === std.unit && amountForStd.value > std.ul) {
         return {
           valid: true, // still valid but warn
-          reason: `${elementName}: ${amount}${unit} per serving exceeds the daily upper limit (UL=${std.ul}${std.unit}).`,
+          reason: `${canonicalName}: ${amount}${unit} per serving exceeds the daily upper limit (UL=${std.ul}${std.unit}).`,
           severity: 'warn',
         };
       }
@@ -114,24 +115,22 @@ function validateNutrient(elementName, amount, unit, db) {
 
     // Check against RDA: if one pill has > 20× RDA, suspicious
     if (std.rda !== null) {
-      let rdaMg = std.rda;
-      if (std.unit === 'mcg') rdaMg = std.rda / 1000;
-      if (std.unit === 'g') rdaMg = std.rda * 1000;
+      const amountForStd = convert(amount, normalizedUnit, std.unit, canonicalName);
 
-      if (rdaMg > 0 && amountMg > rdaMg * 20) {
+      if (amountForStd.unit === std.unit && std.rda > 0 && amountForStd.value > std.rda * 20) {
         return {
           valid: false,
-          reason: `${elementName}: ${amount}${unit} per serving is ${Math.round(amountMg / rdaMg)}× the RDA (${std.rda}${std.unit}). Possible unit confusion (mcg vs mg).`,
+          reason: `${canonicalName}: ${amount}${unit} per serving is ${Math.round(amountForStd.value / std.rda)}x the RDA (${std.rda}${std.unit}). Possible unit confusion.`,
           severity: 'critical',
         };
       }
     }
   } else {
     // No standards — just check absolute reasonableness
-    if (amountMg > 5000) {
+    if (amountMg !== null && amountMg > 5000) {
       return {
         valid: false,
-        reason: `${elementName}: ${amount}${unit} per serving is unusually high for an unclassified substance. Please verify.`,
+        reason: `${canonicalName}: ${amount}${unit} per serving is unusually high for an unclassified substance. Please verify.`,
         severity: 'warn',
       };
     }
@@ -171,8 +170,17 @@ async function importSupplement(req, res, next) {
         type: 'json_object',
       });
     } catch (err) {
-      console.error('[ocr] MIMO failed, using mock:', err.message);
-      ocrResult = mockMimoResponse();
+      if (process.env.ALLOW_MOCK_OCR === 'true') {
+        console.error('[ocr] MIMO failed, using mock because ALLOW_MOCK_OCR=true:', err.message);
+        ocrResult = mockMimoResponse();
+      } else {
+        console.error('[ocr] MIMO failed:', err.message);
+        fs.unlink(req.file.path, () => {});
+        return res.status(502).json({
+          error: 'OCR service unavailable. No supplement was imported.',
+          detail: err.message,
+        });
+      }
     }
 
     // ---- VALIDATION: Check every nutrient for anomalies ----
@@ -194,6 +202,7 @@ async function importSupplement(req, res, next) {
 
     // If any critical issues → FORCE INTERCEPT, return for review, NO DB INSERT
     if (criticalIssues.length > 0) {
+      fs.unlink(req.file.path, () => {});
       return res.json({
         review_required: true,
         product_name: ocrResult.product_name || 'Unknown',
@@ -217,14 +226,19 @@ async function importSupplement(req, res, next) {
       // Normalize: nutrients are listed per SERVING, we store per SINGLE UNIT (pill/capsule)
       const perUnitAmount = rawAmount / Math.max(1, servingSize);
       const canonical = toCanonical(perUnitAmount, rawUnit, resolved.element_name);
+      const bioavailability = detectBioavailability(elementName, resolved.element_name);
 
       processedNutrients.push({
+        raw_element: elementName,
         element: resolved.element_name,
         category: resolved.category,
         amount_per_serving: canonical.value,
         unit: canonical.unit,
         tier: resolved.tier,
         source: resolved.source,
+        form: bioavailability.form,
+        bioavailability_factor: bioavailability.bioavailability_factor,
+        bioavailability_note: bioavailability.bioavailability_note,
       });
     }
 
@@ -248,8 +262,10 @@ async function importSupplement(req, res, next) {
     }
 
     // Insert into user inventory
-    const dosage = parseInt(dosage_per_day) || 1;
-    const totalUnits = ocrResult.total_units_in_bottle || 0;
+    const dosage = Math.max(1, Math.min(20, parseInt(dosage_per_day) || 1));
+    const parsedTotalUnits = parseInt(ocrResult.total_units_in_bottle);
+    const countEstimated = !Number.isFinite(parsedTotalUnits) || parsedTotalUnits <= 0;
+    const totalUnits = countEstimated ? dosage * 30 : parsedTotalUnits;
 
     const result = db.prepare(`
       INSERT INTO inventory (user_id, product_name, brand, total_count, current_count, dosage_per_day, nutrients_json, image_url)
@@ -285,6 +301,7 @@ async function importSupplement(req, res, next) {
       serving_size: ocrResult.serving_size || 1,
       serving_unit: ocrResult.serving_unit,
       total_units_in_bottle: totalUnits,
+      count_estimated: countEstimated,
       dosage_per_day: dosage,
       nutrients: processedNutrients,
       warnings: warnings.length > 0 ? warnings.map(w => w.reason) : [],

@@ -38,7 +38,7 @@ const CLINICAL_CONTEXTS = [
   { pattern: /steroid|corticosteroid|激素|prednisone|prednisolone/i, nutrients: ['Calcium', 'Vitamin D3', 'Potassium', 'Magnesium'], note: 'Corticosteroid use: monitor for calcium/vitamin D depletion and potassium loss.' },
   { pattern: /nodule|结节/i, nutrients: [], note: 'Thyroid/breast nodules: avoid high-dose iodine. Consult endocrinologist before supplementation.' },
   { pattern: /deficiency|缺乏|deficient/i, nutrients: [], note: 'Documented deficiency: prescription doses may exceed standard UL. Medical supervision required.' },
-  { pattern: /pregnant|pregnancy|怀孕|孕期|trimester/i, nutrients: ['Folate (Vitamin B9)', 'Iron', 'Vitamin D3', 'Omega-3 (EPA+DHA)', 'Calcium', 'Iodine'], note: 'Pregnancy: increased need for folate (neural tube), iron (blood volume), DHA (fetal brain), calcium (skeletal), iodine (thyroid). Avoid vitamin A above RDA.' },
+  { pattern: /pregnant|pregnancy|怀孕|孕期|trimester/i, nutrients: ['Vitamin B9 (Folate)', 'Iron', 'Vitamin D3', 'Omega-3 (EPA+DHA)', 'Calcium', 'Iodine'], note: 'Pregnancy: increased need for folate (neural tube), iron (blood volume), DHA (fetal brain), calcium (skeletal), iodine (thyroid). Avoid vitamin A above RDA.' },
   { pattern: /athlet|sport|training|运动员|训练|workout/i, nutrients: ['Creatine', 'BCAA', 'Whey Protein', 'Magnesium', 'Beta-Alanine', 'L-Carnitine'], note: 'Athletic training: increased protein and micronutrient needs. Monitor hydration and electrolyte balance.' },
   { pattern: /statin|atorvastatin|rosuvastatin|simvastatin/i, nutrients: ['Coenzyme Q10 (CoQ10)', 'Vitamin D3', 'Omega-3 (EPA+DHA)'], note: 'Statin use: statins deplete CoQ10, potentially causing muscle pain. CoQ10 supplementation (100-200mg/day) may reduce statin-induced myopathy.' },
   { pattern: /colitis|crohn|IBD|肠炎|malabsorption|吸收不良/i, nutrients: ['Vitamin B12 (Cobalamin)', 'Vitamin D3', 'Magnesium', 'Zinc', 'Iron', 'Probiotics', 'Glutamine'], note: 'IBD/malabsorption: nutrient absorption severely impaired. May need IV or sublingual forms. Monitor all fat-soluble vitamins (A, D, E, K).' },
@@ -67,37 +67,44 @@ function validateOnboardingOutput(aiOutput, userProfile) {
   const nutrients = aiOutput.target_nutrients || [];
 
   for (const nutrient of nutrients) {
+    let nutrientName = nutrient;
     // Check 1: Exists in our database?
     let std = db.prepare(
       "SELECT * FROM nutrient_standards WHERE element_name = ? LIMIT 1"
-    ).get(nutrient);
+    ).get(nutrientName);
 
     if (!std) {
       // Try elementResolver before auto-registering (handles compound names, aliases)
       const resolved = resolveElement(nutrient, 'mg');
       if (resolved && resolved.tier <= 2 && resolved.element_name !== nutrient) {
         // Resolved to a known element — use the canonical name instead
+        nutrientName = resolved.element_name;
         std = db.prepare(
           "SELECT * FROM nutrient_standards WHERE element_name = ? LIMIT 1"
-        ).get(resolved.element_name);
+        ).get(nutrientName);
         if (std) {
-          approvedNutrients.push(resolved.element_name);
-          continue;
+          // Continue through evidence and contraindication checks below using canonical name.
         }
       }
 
-      // Still not found — auto-register as Tier 3
-      db.prepare(`
-        INSERT OR IGNORE INTO nutrient_standards (element_name, category, region, age_min, age_max, gender, rda, ul, unit, source)
-        VALUES (?, 'unclassified', 'US', 0, 120, 'all', NULL, NULL, 'mg', 'ai-validated')
-      `).run(nutrient);
+      if (!std) {
+        // Still not found — auto-register as Tier 3
+        db.prepare(`
+          INSERT OR IGNORE INTO nutrient_standards (element_name, category, region, age_min, age_max, gender, rda, ul, unit, source)
+          VALUES (?, 'unclassified', 'US', 0, 120, 'all', NULL, NULL, 'mg', 'ai-validated')
+        `).run(nutrientName);
 
-      flaggedNutrients.push({
-        nutrient,
-        reason: `"${nutrient}" is not in our reference database. Registered as unclassified.`,
-      });
-      confidence -= 0.05;
-      approvedNutrients.push(nutrient);
+        flaggedNutrients.push({
+          nutrient: nutrientName,
+          reason: `"${nutrientName}" is not in our reference database. Registered as unclassified.`,
+        });
+        confidence -= 0.05;
+        approvedNutrients.push(nutrientName);
+        continue;
+      }
+    }
+
+    if (approvedNutrients.includes(nutrientName)) {
       continue;
     }
 
@@ -111,7 +118,7 @@ function validateOnboardingOutput(aiOutput, userProfile) {
 
       // Level 1: Exact ATC code match (highest confidence)
       if (!evidenceFound && atc && EVIDENCE_BY_ATC[atc]) {
-        if (EVIDENCE_BY_ATC[atc].some(s => s.toLowerCase() === nutrient.toLowerCase())) {
+        if (EVIDENCE_BY_ATC[atc].some(s => normalizeNutrientName(s) === normalizeNutrientName(nutrientName))) {
           evidenceFound = true;
           evidenceSource = `ATC_exact_${atc}`;
         }
@@ -120,7 +127,7 @@ function validateOnboardingOutput(aiOutput, userProfile) {
       // Level 2: Parent ATC via taxonomy tree (SMI-inspired anchoring)
       if (!evidenceFound && atc) {
         const taxResult = getATCNutrients(atc);
-        if (taxResult && taxResult.nutrients.some(s => s.toLowerCase() === nutrient.toLowerCase())) {
+        if (taxResult && taxResult.nutrients.some(s => normalizeNutrientName(s) === normalizeNutrientName(nutrientName))) {
           evidenceFound = true;
           evidenceSource = `${taxResult.source}_${atc}`;
           confidence -= (1 - taxResult.confidence) * 0.15; // Small confidence penalty for parent match
@@ -130,7 +137,7 @@ function validateOnboardingOutput(aiOutput, userProfile) {
       // Level 3: Keyword matching (legacy)
       if (!evidenceFound) {
         for (const [key, supported] of Object.entries(EVIDENCE_BY_KEYWORD)) {
-          if (name.includes(key) && supported.some(s => s.toLowerCase() === nutrient.toLowerCase())) {
+          if (name.includes(key) && supported.some(s => normalizeNutrientName(s) === normalizeNutrientName(nutrientName))) {
             evidenceFound = true;
             evidenceSource = `keyword_${key}`;
             break;
@@ -145,7 +152,7 @@ function validateOnboardingOutput(aiOutput, userProfile) {
       const condNames = conditions.map(c => typeof c === 'string' ? c : c.name || '').join(', ');
       warnings.push({
         type: 'weak_evidence',
-        message: `"${nutrient}" has no established evidence link to conditions: ${condNames}. Consider reviewing.`,
+        message: `"${nutrientName}" has no established evidence link to conditions: ${condNames}. Consider reviewing.`,
       });
       confidence -= 0.1;
     }
@@ -154,10 +161,10 @@ function validateOnboardingOutput(aiOutput, userProfile) {
     for (const cond of conditions) {
       const name = (typeof cond === 'string' ? cond : (cond.name || '')).toLowerCase();
       for (const [key, contraList] of Object.entries(CONTRAINDICATIONS)) {
-        if (name.includes(key) && contraList.some(c => c.toLowerCase() === nutrient.toLowerCase())) {
+        if (name.includes(key) && contraList.some(c => normalizeNutrientName(c) === normalizeNutrientName(nutrientName))) {
           flaggedNutrients.push({
-            nutrient,
-            reason: `CONTRAINDICATED: ${nutrient} is contraindicated for condition "${key}".`,
+            nutrient: nutrientName,
+            reason: `CONTRAINDICATED: ${nutrientName} is contraindicated for condition "${key}".`,
           });
           confidence -= 0.3;
         }
@@ -174,7 +181,7 @@ function validateOnboardingOutput(aiOutput, userProfile) {
           AND (gender = ? OR gender = 'all')
           AND age_min <= ? AND age_max >= ?
         LIMIT 1
-      `).get(nutrient, gender, age, age);
+      `).get(nutrientName, gender, age, age);
 
       if (targetStd && targetStd.ul !== null) {
         // Note: we can't check exact dosage here since we don't know the supplement
@@ -182,13 +189,13 @@ function validateOnboardingOutput(aiOutput, userProfile) {
         if (targetStd.ul < 5 && targetStd.unit === 'mg') {
           warnings.push({
             type: 'narrow_ul',
-            message: `${nutrient} has a low UL (${targetStd.ul} ${targetStd.unit}). Monitor total intake carefully.`,
+            message: `${nutrientName} has a low UL (${targetStd.ul} ${targetStd.unit}). Monitor total intake carefully.`,
           });
         }
       }
     }
 
-    approvedNutrients.push(nutrient);
+    approvedNutrients.push(nutrientName);
   }
 
   // Remove flagged (contraindicated) from approved list
@@ -233,3 +240,28 @@ function validateOnboardingOutput(aiOutput, userProfile) {
 }
 
 module.exports = { validateOnboardingOutput, EVIDENCE_BY_KEYWORD, EVIDENCE_BY_ATC, CONTRAINDICATIONS, CLINICAL_CONTEXTS };
+
+function normalizeNutrientName(name) {
+  const clean = String(name || '').trim().toLowerCase();
+  const aliases = {
+    'vitamin b12': 'vitamin b12 (cobalamin)',
+    b12: 'vitamin b12 (cobalamin)',
+    'riboflavin (b2)': 'vitamin b2 (riboflavin)',
+    riboflavin: 'vitamin b2 (riboflavin)',
+    b2: 'vitamin b2 (riboflavin)',
+    folate: 'vitamin b9 (folate)',
+    'folic acid': 'vitamin b9 (folate)',
+    'folate (vitamin b9)': 'vitamin b9 (folate)',
+    coq10: 'coenzyme q10 (coq10)',
+    'coq 10': 'coenzyme q10 (coq10)',
+    nac: 'nac (n-acetyl cysteine)',
+    curcumin: 'turmeric (curcumin)',
+    turmeric: 'turmeric (curcumin)',
+    'omega 3': 'omega-3 (epa+dha)',
+    'omega-3': 'omega-3 (epa+dha)',
+    magnesium: 'magnesium',
+    'magnesium glycinate': 'magnesium',
+    'magnesium citrate': 'magnesium',
+  };
+  return aliases[clean] || clean;
+}

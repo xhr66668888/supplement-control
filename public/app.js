@@ -104,20 +104,14 @@ function applyI18n() {
     dashBtns[0].textContent = isEN ? 'Refresh Plan' : '刷新计划';
     dashBtns[1].textContent = isEN ? '+ Import Supplement' : '+ 导入补剂';
   }
-  // Dashboard card titles
-  const dashCards = document.querySelectorAll('#page-dashboard h3');
-  if (dashCards.length >= 3) {
-    dashCards[0].textContent = isEN ? 'Daily Element Intake' : '每日元素摄入';
-    dashCards[1].textContent = isEN ? "Today's Schedule" : '今日服药计划';
-    dashCards[2].textContent = isEN ? 'Your Supplements' : '我的补剂';
-  }
-  // Dashboard empty states
-  const emptyStates = document.querySelectorAll('#page-dashboard .caption');
-  if (emptyStates.length >= 3) {
-    emptyStates[0].textContent = isEN ? 'No supplements yet. Import your first supplement to get started.' : '还没有补剂。导入您的第一个补剂以查看进度。';
-    emptyStates[1].textContent = isEN ? 'No schedule generated. Import supplements to create your daily plan.' : '尚未生成服药计划。导入补剂以创建您的每日计划。';
-    emptyStates[2].textContent = isEN ? 'No supplements in your inventory.' : '库存中没有补剂。';
-  }
+  setText('progressTitle', t('dashboard.elementIntake'));
+  setText('scheduleTitle', t('dashboard.todaySchedule'));
+  setText('insightsTitle', t('dashboard.insights'));
+  setText('inventoryTitle', t('dashboard.yourSupplements'));
+  setEmptyCaption('progressContainer', t('dashboard.noSupplements'));
+  setEmptyCaption('scheduleContainer', t('dashboard.noSchedule'));
+  setEmptyCaption('insightsContainer', t('dashboard.noInsights'));
+  setEmptyCaption('inventoryContainer', t('dashboard.noInventory'));
 
   // OCR page
   const ocrTitle = document.querySelector('#page-ocr-import h2');
@@ -134,6 +128,17 @@ function applyI18n() {
   if (ocrBtn) ocrBtn.textContent = isEN ? 'Analyze & Import' : 'AI 分析并导入';
   const cancelBtn = document.querySelector('#page-ocr-import .btn-secondary');
   if (cancelBtn) cancelBtn.textContent = isEN ? 'Cancel' : '取消';
+}
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function setEmptyCaption(containerId, text) {
+  const container = document.getElementById(containerId);
+  const onlyCaption = container?.children?.length === 1 ? container.querySelector(':scope > .caption') : null;
+  if (onlyCaption) onlyCaption.textContent = text;
 }
 
 // ============================================================
@@ -331,6 +336,7 @@ async function refreshDashboard() {
     renderAlerts(data.alerts, data.stock_alerts);
     renderProgress(data.element_progress);
     renderSchedule(data.schedule);
+    renderInsights(data.absorption_profile, data.adherence_summary, data.stock_alerts, data.element_progress);
     renderInventory(data.stock_alerts);
     renderRecommendations(data.user, data.element_progress);
   } catch (err) { console.error('Dashboard error:', err); }
@@ -357,9 +363,9 @@ function renderRecommendations(user, progress) {
   const atcConds = user.atc_conditions || user.conditions || [];
   const atcChips = atcConds.map(c => {
     const name = isZH ? (c.name_cn || c.name) : c.name;
-    return `<span class="chip atc">${name} (${c.atc_code || 'N/A'})</span>`;
+    return `<span class="chip atc">${escapeHTML(name)} (${escapeHTML(c.atc_code || 'N/A')})</span>`;
   }).join(' ');
-  const goalChips = goals.map(g => `<span class="chip goal">${g}</span>`).join(' ');
+  const goalChips = goals.map(g => `<span class="chip goal">${escapeHTML(g)}</span>`).join(' ');
 
   container.innerHTML = `
     <h3 class="mb-sm">${t('dashboard.recommendations')}</h3>
@@ -381,10 +387,12 @@ function renderProgress(elements) {
   });
 
   container.innerHTML = sorted.map(e => {
-    const rdaPct = e.rda_percent || 0;
+    const adjusted = e.absorption_adjusted && e.effective_rda_percent !== null;
+    const rdaPct = adjusted ? (e.effective_rda_percent || 0) : (e.rda_percent || 0);
     const ulPct = e.ul_percent || 0;
     let barClass = 'ok', pctLabel = '';
-    if (e.tier > 1) { barClass = 'tier23'; pctLabel = e.current_intake > 0 ? `${e.current_intake.toFixed(1)} ${e.unit}` : t('progress.noData'); }
+    const displayIntake = adjusted ? e.effective_intake : e.current_intake;
+    if (e.tier > 1) { barClass = 'tier23'; pctLabel = displayIntake > 0 ? `${formatNumber(displayIntake)} ${e.unit}` : t('progress.noData'); }
     else if (ulPct >= 100) { barClass = 'over'; pctLabel = `${ulPct}% UL -- ${t('progress.aboveUL')}`; }
     else if (rdaPct >= 100) { barClass = 'warn'; pctLabel = `${rdaPct}% RDA -- ${t('progress.adequate')}`; }
     else if (rdaPct >= 70) { barClass = 'ok'; pctLabel = `${rdaPct}% RDA -- ${t('progress.onTrack')}`; }
@@ -396,18 +404,27 @@ function renderProgress(elements) {
     const tierLabel = e.tier === 1 ? t('progress.rdaAvailable') : e.tier === 2 ? t('progress.noRDA') : t('progress.unverified');
     const rdaInfo = e.rda ? `RDA: ${e.rda} ${e.unit}` : t('progress.noRDA');
     const ulInfo = e.ul ? `UL: ${e.ul} ${e.unit}` : '';
+    const notes = [...(e.bioavailability_notes || []), ...(e.absorption_notes || [])].slice(0, 2);
+    const detail = adjusted
+      ? `<div class="caption mt-sm">${t('dashboard.effective')}: ${formatNumber(e.effective_intake)} ${escapeHTML(e.unit)} · ${t('dashboard.labeled')}: ${formatNumber(e.current_intake)} ${escapeHTML(e.unit)}</div>`
+      : '';
+    const noteHtml = notes.length
+      ? `<div class="caption mt-sm">${notes.map(escapeHTML).join(' ')}</div>`
+      : '';
 
     return `
       <div class="progress-item">
         <div class="progress-header">
-          <span class="el-name">${e.element}</span>
+          <span class="el-name">${escapeHTML(e.element)}</span>
           <span class="el-pct" style="color:${barClass === 'over' ? 'var(--semantic-down)' : barClass === 'warn' ? 'var(--accent-yellow)' : 'var(--semantic-up)'}">${pctLabel || `${e.current_intake.toFixed(1)} ${e.unit}`}</span>
         </div>
-        <div class="bar-wrap" role="progressbar" aria-valuenow="${Math.round(rdaPct)}" aria-valuemin="0" aria-valuemax="150" aria-label="${e.element}: ${rdaPct}% RDA, ${rdaInfo}, ${ulInfo}, ${tierLabel}">
+        <div class="bar-wrap" role="progressbar" aria-valuenow="${Math.round(rdaPct)}" aria-valuemin="0" aria-valuemax="150" aria-label="${escapeHTML(e.element)}: ${rdaPct}% RDA, ${escapeHTML(rdaInfo)}, ${escapeHTML(ulInfo)}, ${escapeHTML(tierLabel)}">
           ${e.tier === 1 ? '<div class="bar-zone green"></div><div class="bar-zone yellow"></div>' : ''}
           <div class="bar-fill ${barClass}" style="width:${barWidth}%"></div>
           ${ulMarker !== null && e.tier === 1 ? `<div class="bar-ul-line" style="left:${Math.min(ulMarker, 98)}%" title="UL: ${e.ul} ${e.unit}"></div>` : ''}
         </div>
+        ${detail}
+        ${noteHtml}
       </div>`;
   }).join('');
 }
@@ -423,16 +440,17 @@ function renderSchedule(schedule) {
   let html = '';
   for (const [tod, items] of Object.entries(groups)) {
     if (items.length === 0) continue;
-    html += `<div class="time-group ${tod}"><h3>${t('schedule.' + tod.replace(/-/g, '') === 'morningempty' ? 'schedule.morningEmpty' : 'schedule.' + tod)}</h3>`;
+    html += `<div class="time-group ${tod}"><h3></h3>`;
     items.forEach(item => {
       const done = item.consumed ? ' done' : '';
       const pillLabel = item.dosage > 1 ? t('schedule.pills') : t('schedule.pill');
+      const product = escapeHTML(item.product_name);
       html += `
         <div class="sched-item${done}" id="sched-${item.id}">
-          <input type="checkbox" ${item.consumed ? 'checked disabled' : ''} onclick="event.stopPropagation(); checkDose(${item.id})" aria-label="Mark ${item.product_name} taken">
-          <span class="sched-name">${item.product_name}</span>
+          <input type="checkbox" ${item.consumed ? 'checked disabled' : ''} onclick="event.stopPropagation(); checkDose(${item.id})" aria-label="Mark ${product} taken">
+          <span class="sched-name">${product}</span>
           <span class="sched-dose">${item.dosage} ${pillLabel}</span>
-          ${!item.consumed ? `<button class="sched-skip" onclick="event.stopPropagation(); skipDose(${item.id})" aria-label="Skip ${item.product_name}" title="Skip">&times;</button>` : ''}
+          ${!item.consumed ? `<button class="sched-skip" onclick="event.stopPropagation(); skipDose(${item.id})" aria-label="Skip ${product}" title="Skip">&times;</button>` : ''}
         </div>`;
     });
     html += '</div>';
@@ -458,8 +476,13 @@ async function checkDose(scheduleId) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || data.error);
     const row = document.getElementById(`sched-${scheduleId}`);
-    if (row) { row.classList.add('done'); row.querySelector('input[type=checkbox]').checked = true; row.querySelector('input[type=checkbox]').disabled = true; }
-    showToast(I18N.t('toast.doseTaken'), () => undoCheckDose(scheduleId));
+    if (row) {
+      row.classList.add('done');
+      row.querySelector('input[type=checkbox]').checked = true;
+      row.querySelector('input[type=checkbox]').disabled = true;
+      row.querySelector('.sched-skip')?.remove();
+    }
+    showToast(I18N.t('toast.doseTaken'), scheduleId);
     undoTimers[scheduleId] = setTimeout(() => { delete undoTimers[scheduleId]; refreshDashboard(); }, 30000);
   } catch (err) { alert('Failed: ' + err.message); }
 }
@@ -477,10 +500,67 @@ async function skipDose(scheduleId) {
   setTimeout(refreshDashboard, 500);
 }
 
-function showToast(msg, onUndo) {
+function showToast(msg, undoScheduleId) {
   const container = document.getElementById('toastContainer');
-  container.innerHTML = `<div class="toast"><span>${msg}</span>${onUndo ? `<button class="toast-undo" onclick="this.closest('.toast').remove();(${onUndo.toString()})()">${I18N.t('toast.undo')}</button>` : ''}</div>`;
-  if (!onUndo) setTimeout(() => { container.innerHTML = ''; }, 4000);
+  container.innerHTML = '';
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  toast.appendChild(span);
+  if (undoScheduleId) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-undo';
+    btn.textContent = I18N.t('toast.undo');
+    btn.addEventListener('click', () => {
+      toast.remove();
+      undoCheckDose(undoScheduleId);
+    });
+    toast.appendChild(btn);
+  }
+  container.appendChild(toast);
+  if (!undoScheduleId) setTimeout(() => { container.innerHTML = ''; }, 4000);
+}
+
+function renderInsights(absorptionProfile, adherenceSummary, stockAlerts, elements) {
+  const container = document.getElementById('insightsContainer');
+  const t = I18N.t.bind(I18N);
+  if ((!stockAlerts || stockAlerts.length === 0) && (!elements || elements.length === 0)) {
+    container.innerHTML = `<p class="caption">${t('dashboard.noInsights')}</p>`;
+    return;
+  }
+
+  const levelKey = absorptionProfile?.level === 'reduced'
+    ? 'dashboard.absorptionReduced'
+    : absorptionProfile?.level === 'watch'
+      ? 'dashboard.absorptionWatch'
+      : 'dashboard.absorptionNormal';
+  const adherenceKey = adherenceSummary?.status === 'steady'
+    ? 'dashboard.adherenceSteady'
+    : adherenceSummary?.status === 'irregular'
+      ? 'dashboard.adherenceIrregular'
+      : adherenceSummary?.status === 'low'
+        ? 'dashboard.adherenceLow'
+        : 'dashboard.adherenceUnknown';
+  const nextEmpty = [...(stockAlerts || [])]
+    .filter(s => s.predicted_depletion_date)
+    .sort((a, b) => (a.predicted_remaining_days || 9999) - (b.predicted_remaining_days || 9999))[0];
+  const notes = [
+    ...(absorptionProfile?.notes || []),
+    ...(elements || []).flatMap(e => [...(e.bioavailability_notes || []), ...(e.absorption_notes || [])]),
+  ].filter(Boolean).slice(0, 3);
+
+  const adherenceValue = adherenceSummary?.adherence_percent === null || adherenceSummary?.adherence_percent === undefined
+    ? '--'
+    : `${adherenceSummary.adherence_percent}%`;
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+      <div><div class="caption">${t('dashboard.absorptionScore')}</div><div class="num">${Math.round((absorptionProfile?.score || 1) * 100)}% · ${t(levelKey)}</div></div>
+      <div><div class="caption">${t('dashboard.adherence')}</div><div class="num">${adherenceValue} · ${t(adherenceKey)}</div></div>
+      <div><div class="caption">${t('dashboard.predicted')}</div><div class="num">${nextEmpty ? `${escapeHTML(nextEmpty.product_name)} · ${escapeHTML(nextEmpty.predicted_depletion_date)}` : '--'}</div></div>
+    </div>
+    ${notes.length ? `<div class="caption mt-base">${notes.map(escapeHTML).join(' ')}</div>` : ''}
+  `;
 }
 
 function renderInventory(stockAlerts) {
@@ -492,9 +572,11 @@ function renderInventory(stockAlerts) {
     const color = sa.status === 'critical' ? 'var(--semantic-down)' : sa.status === 'low' ? 'var(--accent-yellow)' : 'var(--semantic-up)';
     const label = sa.status === 'critical' ? t('inventory.critical') : sa.status === 'low' ? t('inventory.low') : t('inventory.ok');
     const icon = sa.status === 'critical' ? '!' : sa.status === 'low' ? '~' : '';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairline-soft);">
-      <div><span style="font-weight:500;">${sa.product_name}</span><span class="body-sm" style="margin-left:8px;">${t('dashboard.unitsLeft', {count: sa.current_count})}</span></div>
-      <div class="status-icon" style="gap:8px;"><span class="num" style="color:${color};">${icon} ${t('dashboard.days', {days: sa.remaining_days})}</span><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--radius-pill);background:${color}22;color:${color};">${label}</span></div></div>`;
+    const predicted = sa.predicted_depletion_date ? ` · ${t('dashboard.predicted')}: ${sa.predicted_depletion_date}` : '';
+    const daysLabel = sa.remaining_days === null || sa.remaining_days === undefined ? '--' : t('dashboard.days', {days: sa.remaining_days});
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairline-soft);gap:12px;">
+      <div><span style="font-weight:500;">${escapeHTML(sa.product_name)}</span><span class="body-sm" style="margin-left:8px;">${t('dashboard.unitsLeft', {count: sa.current_count})}${escapeHTML(predicted)}</span></div>
+      <div class="status-icon" style="gap:8px;"><span class="num" style="color:${color};">${icon} ${daysLabel}</span><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--radius-pill);background:${color}22;color:${color};">${label}</span></div></div>`;
   }).join('');
 }
 
@@ -503,7 +585,7 @@ function renderAlerts(alerts, stockAlerts) {
   const t = I18N.t.bind(I18N);
   const seen = new Set(); const unique = [];
   for (const a of (alerts || [])) {
-    const key = `${a.alert_type}-${a.inventory_id || 'system'}-${new Date().toISOString().slice(0, 10)}`;
+    const key = `${a.alert_type}-${a.inventory_id || 'system'}-${a.message || ''}-${new Date().toISOString().slice(0, 10)}`;
     if (!seen.has(key)) { seen.add(key); unique.push(a); }
   }
   (stockAlerts || []).forEach(sa => {
@@ -520,8 +602,16 @@ function renderAlerts(alerts, stockAlerts) {
   container.style.display = 'block';
   container.innerHTML = unique.map(a => {
     let cls = a.alert_type === 'critical_stock' || a.alert_type === 'ul_warning' ? 'critical' : a.alert_type === 'low_stock' ? 'warning' : 'info';
-    return `<div class="alert ${cls}"><span>${a.message}</span><button class="alert-dismiss" onclick="this.parentElement.remove()" aria-label="${t('alerts.dismiss')}">&times;</button></div>`;
+    return `<div class="alert ${cls}"><span>${escapeHTML(a.message)}</span><button class="alert-dismiss" onclick="dismissAlert(this, ${Number(a.id) || 0})" aria-label="${t('alerts.dismiss')}">&times;</button></div>`;
   }).join('');
+}
+
+async function dismissAlert(button, alertId) {
+  button.parentElement.remove();
+  if (!alertId) return;
+  try {
+    await fetch(`${API}/dashboard/alerts/${alertId}/ack`, { method: 'POST', headers: authHeader() });
+  } catch {}
 }
 
 // ============================================================
@@ -544,6 +634,12 @@ function setupOcrUpload() {
   const status = document.getElementById('ocrStatus');
 
   zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      input.click();
+    }
+  });
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; });
   zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
   zone.addEventListener('drop', e => { e.preventDefault(); zone.style.borderColor = ''; if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; handleFile(); } });
@@ -552,6 +648,12 @@ function setupOcrUpload() {
   function handleFile() {
     const file = input.files[0];
     if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
+      status.textContent = I18N.t('ocr.failed', { error: 'Invalid image file' });
+      input.value = '';
+      btn.disabled = true;
+      return;
+    }
     const reader = new FileReader();
     reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; zone.classList.add('has-file'); };
     reader.readAsDataURL(file);
@@ -583,7 +685,7 @@ function setupOcrUpload() {
             <h3 style="color:var(--semantic-down);margin-bottom:8px;">${I18N.t('ocr.reviewRequired')}</h3>
             <p class="body-sm">${I18N.t('ocr.reviewMsg')}</p>
           </div>
-          ${(data.critical_issues || []).map(c => `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:14px;">${c}</div>`).join('')}
+          ${(data.critical_issues || []).map(c => `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:14px;">${escapeHTML(c)}</div>`).join('')}
           <p class="caption mt-sm">${I18N.t('ocr.notSaved')}</p>`;
         status.textContent = I18N.t('ocr.blocked');
         btn.disabled = true; return;
@@ -598,4 +700,22 @@ function setupOcrUpload() {
       btn.disabled = false;
     }
   });
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '--';
+  if (Math.abs(n) >= 100) return Math.round(n).toString();
+  if (Math.abs(n) >= 10) return n.toFixed(1).replace(/\.0$/, '');
+  return n.toFixed(2).replace(/0$/, '').replace(/\.0$/, '');
 }

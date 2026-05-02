@@ -1,5 +1,15 @@
 # Bio-Nutrient Manager 未来改进方向
 
+## 本轮已落地的近期改进（2026-05-02）
+
+- **单位安全的摄入计算**：修复 IU / mcg / mg / g 的换算链路，Dashboard 和 UL/RDA 校验会先转换到标准单位再比较。
+- **交互感知排程**：`schedulerCore` 现在会保留当天已服用/已跳过状态，并在新补剂导入后补齐今日计划；吸收竞争、警示和 toxic 组合会尽量错开时段。
+- **补剂形式与相对生物利用度**：OCR 入库会记录 magnesium oxide/glycinate、calcium carbonate/citrate、curcumin phytosome/piperine、B12/folate 等形式，并给 Dashboard 提供“标签剂量”和“估算有效摄入”。
+- **个性化吸收评分**：基于年龄、胃肠道问题、PPI/二甲双胍、素食、MTHFR 等 onboarding 信号生成吸收风险提示。
+- **依从性与库存预测**：库存耗尽日期现在结合近 30 天 consumption log 的平均使用量，而不是只用静态 dosage_per_day。
+- **可信 OCR 失败模式**：MIMO 失败时默认不再导入 demo/mock 补剂；只有显式设置 `ALLOW_MOCK_OCR=true` 才允许开发环境 mock。
+- **前端可信度改进**：修复撤销服用、跳过后刷新、告警持久忽略和动态内容转义，降低误操作和 XSS 风险。
+
 ## 1. 双曲空间嵌入与语义距离计算（已在 taxonomy.js 中初步实现）
 
 当前实现：基于 ATC 树深度的 `sech` 函数置信度衰减 + `hyperbolicDistance` 语义距离函数。这模拟了庞加莱球模型中"体积随半径指数增长"的核心特性——树越深，兄弟节点之间的语义距离越大。

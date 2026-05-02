@@ -10,7 +10,7 @@
  */
 
 const { getDb } = require('../config/database');
-const { deepseekChat } = require('../utils/aiClient');
+const { deepseekChat } = require('../utils/apiReliable');
 
 const SYSTEM_PROMPT = `You are a pharmacology and nutrition research assistant. You will be given the name of a supplement ingredient. Research it and return a JSON object with safety and dosing information.
 
