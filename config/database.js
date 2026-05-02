@@ -26,8 +26,20 @@ function initDb(dbPath) {
     'utf-8'
   );
   database.exec(schema);
+  runDataMigrations(database);
   console.log('[db] Schema initialized');
   return database;
+}
+
+function runDataMigrations(database) {
+  database.prepare(`
+    UPDATE nutrient_standards
+    SET rda = 9.0
+    WHERE element_name = 'Vitamin D3'
+      AND region = 'JP'
+      AND age_min >= 18
+      AND rda = 8.5
+  `).run();
 }
 
 function closeDb() {

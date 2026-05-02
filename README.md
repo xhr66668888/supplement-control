@@ -104,6 +104,7 @@ Open `http://localhost:3000` in a browser. Register an account, complete your he
 | POST | /api/supplements/import | JWT | OCR import supplement label |
 | POST | /api/ocr | JWT | Alias for OCR import |
 | GET | /api/inventory | JWT | List user inventory |
+| DELETE | /api/inventory/:id | JWT | Remove a supplement from current user's inventory |
 | GET | /api/elements | JWT | List known elements |
 | POST | /api/elements/lookup | JWT | AI research unknown element |
 

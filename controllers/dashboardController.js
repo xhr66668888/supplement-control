@@ -12,6 +12,7 @@ const { getDb } = require('../config/database');
 const schedulerCore = require('../utils/schedulerCore');
 const { convert } = require('../utils/unitConverter');
 const { buildAbsorptionProfile, absorptionMultiplierFor } = require('../utils/absorptionProfile');
+const { classifyUL } = require('../utils/safetyBands');
 
 /**
  * GET /api/dashboard — uses JWT user_id from auth middleware
@@ -214,6 +215,7 @@ async function getDashboard(req, res, next) {
         rda_percent: data.rda ? Math.round((data.amount / data.rda) * 100) : null,
         effective_rda_percent: data.rda ? Math.round((data.effective_amount / data.rda) * 100) : null,
         ul_percent: data.ul ? Math.round((data.amount / data.ul) * 100) : null,
+        ul_status: classifyUL(data.amount, data.ul).status,
         absorption_adjusted: Math.abs(data.effective_amount - data.amount) > 0.01,
         forms: [...data.forms],
         bioavailability_notes: [...data.bioavailability_notes],

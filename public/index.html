@@ -67,8 +67,8 @@
     .btn-sm { padding: 8px 16px; height: 36px; font-size: 14px; }
 
     /* Cards */
-    .card { background: var(--surface-card); border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: var(--space-xl); }
-    .card-soft { background: var(--surface-soft); border: 1px solid var(--hairline-soft); border-radius: var(--radius-xl); padding: var(--space-xl); }
+    .card { background: var(--surface-card); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: var(--space-xl); }
+    .card-soft { background: var(--surface-soft); border: 1px solid var(--hairline-soft); border-radius: var(--radius-sm); padding: var(--space-xl); }
 
     /* Forms */
     .input-group { margin-bottom: var(--space-base); }
@@ -82,10 +82,11 @@
     textarea.input { height: auto; min-height: 100px; resize: vertical; }
 
     /* Auth pages */
-    .auth-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--space-xxl) var(--space-base); }
-    .auth-hero h1 { margin-bottom: var(--space-sm); }
-    .auth-hero .subtitle { font-size: 18px; color: var(--body); max-width: 560px; margin-bottom: var(--space-xl); }
-    .auth-card { max-width: 440px; margin: 0 auto; }
+    .auth-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 72px var(--space-base) var(--space-xxl); }
+    .auth-hero h1 { margin-bottom: var(--space-lg); font-size: 36px; font-weight: 600; letter-spacing: 0; }
+    .auth-hero .subtitle, .auth-card h3 { display: none; }
+    .auth-card { max-width: 360px; margin: 0 auto; padding: var(--space-lg); }
+    .auth-card .input-group label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
     /* AI Loading */
     .ai-processing { display: none; align-items: center; justify-content: center; gap: var(--space-sm); padding: var(--space-lg); margin: var(--space-base) 0; background: var(--surface-soft); border-radius: var(--radius-xl); border: 1px solid var(--hairline-soft); }
@@ -150,6 +151,8 @@
     .alert.warning { background: #fffbeb; border-left: 3px solid var(--accent-yellow); color: #92400e; }
     .alert.info { background: #eff6ff; border-left: 3px solid var(--primary); color: #1e40af; }
     .alert-dismiss { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: inherit; opacity: 0.5; flex-shrink: 0; }
+    .danger-link { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 4px 0; }
+    .danger-link:hover { color: var(--semantic-down); }
 
     /* OCR Upload */
     .upload-zone { border: 2px dashed var(--hairline); border-radius: var(--radius-xl); padding: var(--space-xxl) var(--space-xl); text-align: center; cursor: pointer; transition: border-color 0.2s; }
@@ -175,7 +178,7 @@
   <nav class="top-nav">
     <div class="nav-left">
       <button class="nav-back" id="navBack" aria-label="Go back" onclick="goBack()">&larr;</button>
-      <span class="brand">Bio-Nutrient Manager</span>
+      <span class="brand">保健品管理系统</span>
     </div>
     <div class="nav-right" id="navRight">
       <button class="btn btn-tertiary btn-sm" id="langToggle" onclick="toggleLang()" aria-label="Switch language">EN</button>
@@ -200,8 +203,8 @@
   <!-- REGISTER -->
   <div class="page" id="page-register">
     <div class="auth-hero">
-      <h1>个性化补剂智能管理</h1>
-      <p class="subtitle">停止盲目服用补剂。获取基于科学的、为您量身定制的服用计划。</p>
+      <h1>保健品管理系统</h1>
+      <p class="subtitle"></p>
       <div class="card auth-card w-full">
         <h3 class="mb-base">创建账户</h3>
         <div class="input-group"><label for="regUser">用户名</label><input class="input" id="regUser" aria-label="用户名" placeholder="输入用户名" autocomplete="username"><div class="field-error" id="regUserErr"></div></div>
@@ -215,8 +218,8 @@
   <!-- LOGIN -->
   <div id="page-login" class="page">
     <div class="auth-hero">
-      <h1>欢迎回来</h1>
-      <p class="subtitle">登录查看您的每日补剂服用计划。</p>
+      <h1>保健品管理系统</h1>
+      <p class="subtitle"></p>
       <div class="card auth-card w-full">
         <h3 class="mb-base">登录</h3>
         <div class="input-group"><label for="loginUser">用户名</label><input class="input" id="loginUser" aria-label="用户名" placeholder="输入用户名" autocomplete="username"></div>

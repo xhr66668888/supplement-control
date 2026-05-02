@@ -55,7 +55,7 @@ const elements = [
 
   { el:'Vitamin D3',        cat:'vitamin', rgn:US, min:19, max:70,  g:ALL, rda:15,    ul:100,   unit:'mcg' },
   { el:'Vitamin D3',        cat:'vitamin', rgn:US, min:71, max:120, g:ALL, rda:20,    ul:100,   unit:'mcg' },
-  { el:'Vitamin D3',        cat:'vitamin', rgn:JP, min:18, max:120, g:ALL, rda:8.5,   ul:100,   unit:'mcg' },
+  { el:'Vitamin D3',        cat:'vitamin', rgn:JP, min:18, max:120, g:ALL, rda:9.0,   ul:100,   unit:'mcg' },
 
   { el:'Vitamin E',         cat:'vitamin', rgn:US, min:19, max:120, g:ALL, rda:15,    ul:1000,  unit:'mg' },
   { el:'Vitamin E',         cat:'vitamin', rgn:JP, min:18, max:120, g:ALL, rda:6.5,   ul:800,   unit:'mg' },

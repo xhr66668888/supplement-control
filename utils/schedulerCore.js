@@ -19,6 +19,7 @@
 
 const { getDb } = require('../config/database');
 const { convert } = require('./unitConverter');
+const { classifyUL, UL_CRITICAL_RATIO } = require('./safetyBands');
 
 const TIME_ORDER = ['morning-empty', 'with-meal', 'after-lunch', 'before-bed'];
 
@@ -124,12 +125,13 @@ class SchedulerCore {
         total.category = std.category;
       }
 
-      // UL Check: if over UL, flag alert. (Only for Tier 1 elements with UL)
-      if (total.ul !== null && total.amount > total.ul) {
+      // Persist only critical UL alerts; modest exceedances are shown as yellow dashboard cautions.
+      const ulSafety = classifyUL(total.amount, total.ul);
+      if (ulSafety.status === 'critical') {
         alerts.push({
           alert_type: 'ul_warning',
           inventory_id: null,
-          message: `${elName}: ${total.amount} ${total.unit} exceeds UL of ${total.ul} ${total.unit}. Reduce dosage or remove supplement.`,
+          message: `${elName}: ${roundAmount(total.amount)} ${total.unit} exceeds ${Math.round(UL_CRITICAL_RATIO * 100)}% of the official UL (${total.ul} ${total.unit}). Reduce dosage or review with a clinician.`,
         });
       }
     }
@@ -344,4 +346,8 @@ function insertAlertOnce(db, userId, inventoryId, alertType, message) {
     INSERT INTO alerts (user_id, inventory_id, alert_type, message)
     VALUES (?, ?, ?, ?)
   `).run(userId, inventoryId, alertType, message);
+}
+
+function roundAmount(value) {
+  return Math.round(value * 100) / 100;
 }

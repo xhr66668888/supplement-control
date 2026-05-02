@@ -35,39 +35,46 @@ function applyI18n() {
   document.getElementById('langToggleAuth').textContent = isEN ? '中文' : 'EN';
 
   // Nav
-  document.getElementById('navSignIn').textContent = isEN ? 'Sign In' : '登录';
-  document.getElementById('navGetStarted').textContent = isEN ? 'Get Started' : '注册';
-  document.getElementById('navRefresh').textContent = isEN ? 'Refresh' : '刷新';
-  document.getElementById('navSignOut').textContent = isEN ? 'Sign Out' : '退出';
+  document.title = t('nav.brand');
+  const brand = document.querySelector('.top-nav .brand');
+  if (brand) brand.textContent = t('nav.brand');
+  document.getElementById('navSignIn').textContent = t('nav.signIn');
+  document.getElementById('navGetStarted').textContent = t('nav.getStarted');
+  document.getElementById('navRefresh').textContent = t('nav.refresh');
+  document.getElementById('navSignOut').textContent = t('nav.signOut');
 
   // Register page
   const regTitle = document.querySelector('#page-register h1');
-  if (regTitle) regTitle.textContent = isEN ? 'Personalized supplement intelligence' : '个性化补剂智能管理';
+  if (regTitle) regTitle.textContent = t('auth.createTitle');
   const regSub = document.querySelector('#page-register .subtitle');
-  if (regSub) regSub.textContent = isEN ? 'Stop taking supplements blindly. Get science-based dosing schedules tailored to your biology.' : '停止盲目服用补剂。获取基于科学的、为您量身定制的服用计划。';
+  if (regSub) regSub.textContent = t('auth.createSubtitle');
   const regH3 = document.querySelector('#page-register h3');
-  if (regH3) regH3.textContent = isEN ? 'Create your account' : '创建账户';
-  document.querySelector('#page-register label[for=regUser]').textContent = isEN ? 'Username' : '用户名';
-  document.getElementById('regUser').placeholder = isEN ? 'Choose a username' : '输入用户名';
-  document.querySelector('#page-register label[for=regPass]').textContent = isEN ? 'Password' : '密码';
-  document.getElementById('regPass').placeholder = isEN ? 'At least 6 characters' : '至少6个字符';
-  document.getElementById('regBtn').textContent = isEN ? 'Create Account' : '创建账户';
+  if (regH3) regH3.textContent = t('auth.createAccount');
+  document.querySelector('#page-register label[for=regUser]').textContent = t('auth.username');
+  document.getElementById('regUser').placeholder = t('auth.username');
+  document.querySelector('#page-register label[for=regPass]').textContent = t('auth.password');
+  document.getElementById('regPass').placeholder = t('auth.passwordHint');
+  document.getElementById('regBtn').textContent = t('auth.createBtn');
+  const regFooter = document.querySelector('#page-register .caption');
+  if (regFooter) regFooter.innerHTML = `${t('auth.hasAccount')} <a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('login')">${t('auth.signIn')}</a>`;
 
   // Login page
   const loginTitle = document.querySelector('#page-login h1');
-  if (loginTitle) loginTitle.textContent = isEN ? 'Welcome back' : '欢迎回来';
+  if (loginTitle) loginTitle.textContent = t('auth.welcomeTitle');
   const loginSub = document.querySelector('#page-login .subtitle');
-  if (loginSub) loginSub.textContent = isEN ? 'Sign in to view your daily supplement schedule.' : '登录查看您的每日补剂服用计划。';
+  if (loginSub) loginSub.textContent = t('auth.welcomeSubtitle');
   const loginH3 = document.querySelector('#page-login h3');
-  if (loginH3) loginH3.textContent = isEN ? 'Sign in' : '登录';
+  if (loginH3) loginH3.textContent = t('auth.signInTitle');
   const loginUserLabel = document.querySelector('#page-login label[for=loginUser]');
-  if (loginUserLabel) loginUserLabel.textContent = isEN ? 'Username' : '用户名';
-  document.getElementById('loginUser').placeholder = isEN ? 'Your username' : '输入用户名';
+  if (loginUserLabel) loginUserLabel.textContent = t('auth.username');
+  document.getElementById('loginUser').placeholder = t('auth.username');
   const loginPassLabel = document.querySelector('#page-login label[for=loginPass]');
-  if (loginPassLabel) loginPassLabel.textContent = isEN ? 'Password' : '密码';
-  document.getElementById('loginPass').placeholder = isEN ? 'Your password' : '输入密码';
+  if (loginPassLabel) loginPassLabel.textContent = t('auth.password');
+  document.getElementById('loginPass').placeholder = t('auth.password');
   const loginBtn = document.querySelector('#page-login .btn-primary');
-  if (loginBtn) loginBtn.textContent = isEN ? 'Sign In' : '登录';
+  if (loginBtn) loginBtn.textContent = t('auth.signInBtn');
+  const loginFooter = document.querySelector('#page-login .caption');
+  if (loginFooter) loginFooter.innerHTML = `${t('auth.noAccount')} <a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('register')">${t('auth.createOne')}</a>`;
 
   // Onboarding page
   const onbTitle = document.querySelector('#page-onboard-intro h2');
@@ -393,7 +400,8 @@ function renderProgress(elements) {
     let barClass = 'ok', pctLabel = '';
     const displayIntake = adjusted ? e.effective_intake : e.current_intake;
     if (e.tier > 1) { barClass = 'tier23'; pctLabel = displayIntake > 0 ? `${formatNumber(displayIntake)} ${e.unit}` : t('progress.noData'); }
-    else if (ulPct >= 100) { barClass = 'over'; pctLabel = `${ulPct}% UL -- ${t('progress.aboveUL')}`; }
+    else if (e.ul_status === 'critical') { barClass = 'over'; pctLabel = `${ulPct}% UL -- ${t('progress.aboveUL')}`; }
+    else if (e.ul_status === 'caution') { barClass = 'warn'; pctLabel = `${ulPct}% UL -- ${t('progress.aboveULCaution')}`; }
     else if (rdaPct >= 100) { barClass = 'warn'; pctLabel = `${rdaPct}% RDA -- ${t('progress.adequate')}`; }
     else if (rdaPct >= 70) { barClass = 'ok'; pctLabel = `${rdaPct}% RDA -- ${t('progress.onTrack')}`; }
     else { barClass = 'warn'; pctLabel = `${rdaPct}% RDA -- ${t('progress.low')}`; }
@@ -576,8 +584,23 @@ function renderInventory(stockAlerts) {
     const daysLabel = sa.remaining_days === null || sa.remaining_days === undefined ? '--' : t('dashboard.days', {days: sa.remaining_days});
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairline-soft);gap:12px;">
       <div><span style="font-weight:500;">${escapeHTML(sa.product_name)}</span><span class="body-sm" style="margin-left:8px;">${t('dashboard.unitsLeft', {count: sa.current_count})}${escapeHTML(predicted)}</span></div>
-      <div class="status-icon" style="gap:8px;"><span class="num" style="color:${color};">${icon} ${daysLabel}</span><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--radius-pill);background:${color}22;color:${color};">${label}</span></div></div>`;
+      <div class="status-icon" style="gap:8px;"><span class="num" style="color:${color};">${icon} ${daysLabel}</span><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--radius-pill);background:${color}22;color:${color};">${label}</span><button class="danger-link" data-name="${escapeHTML(sa.product_name)}" onclick="deleteInventoryItem(this, ${sa.inventory_id})">${t('dashboard.deleteItem')}</button></div></div>`;
   }).join('');
+}
+
+async function deleteInventoryItem(button, inventoryId) {
+  const productName = button.dataset.name || '';
+  const confirmed = confirm(I18N.t('dashboard.deleteConfirm', { name: productName }));
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${API}/inventory/${inventoryId}`, { method: 'DELETE', headers: authHeader() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.error);
+    refreshDashboard();
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
 }
 
 function renderAlerts(alerts, stockAlerts) {

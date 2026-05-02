@@ -56,4 +56,24 @@ router.post('/consume', (req, res, next) => {
   }
 });
 
+// DELETE /api/inventory/:id — remove a supplement from the user's active inventory.
+router.delete('/:id', (req, res, next) => {
+  try {
+    const userId = req.user?.user_id;
+    const inventoryId = parseInt(req.params.id);
+    if (!userId || !inventoryId) {
+      return res.status(400).json({ error: 'inventory id required' });
+    }
+
+    const db = getDb();
+    const item = db.prepare('SELECT id, product_name FROM inventory WHERE id = ? AND user_id = ?').get(inventoryId, userId);
+    if (!item) return res.status(404).json({ error: 'Inventory item not found' });
+
+    db.prepare('DELETE FROM inventory WHERE id = ? AND user_id = ?').run(inventoryId, userId);
+    res.json({ success: true, inventory_id: inventoryId, product_name: item.product_name });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
