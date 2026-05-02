@@ -27,12 +27,113 @@ function toggleLang() {
 function applyI18n() {
   const L = I18N.getLang();
   document.documentElement.lang = L;
-  document.getElementById('langToggle').textContent = I18N.t('langLabel');
-  document.getElementById('langToggleAuth').textContent = I18N.t('langLabel');
-  document.getElementById('navSignIn').textContent = I18N.t('nav.signIn');
-  document.getElementById('navGetStarted').textContent = I18N.t('nav.getStarted');
-  document.getElementById('navRefresh').textContent = I18N.t('nav.refresh');
-  document.getElementById('navSignOut').textContent = I18N.t('nav.signOut');
+  const isEN = L === 'en';
+  const t = I18N.t.bind(I18N);
+
+  // Language toggle buttons
+  document.getElementById('langToggle').textContent = isEN ? '中文' : 'EN';
+  document.getElementById('langToggleAuth').textContent = isEN ? '中文' : 'EN';
+
+  // Nav
+  document.getElementById('navSignIn').textContent = isEN ? 'Sign In' : '登录';
+  document.getElementById('navGetStarted').textContent = isEN ? 'Get Started' : '注册';
+  document.getElementById('navRefresh').textContent = isEN ? 'Refresh' : '刷新';
+  document.getElementById('navSignOut').textContent = isEN ? 'Sign Out' : '退出';
+
+  // Register page
+  const regTitle = document.querySelector('#page-register h1');
+  if (regTitle) regTitle.textContent = isEN ? 'Personalized supplement intelligence' : '个性化补剂智能管理';
+  const regSub = document.querySelector('#page-register .subtitle');
+  if (regSub) regSub.textContent = isEN ? 'Stop taking supplements blindly. Get science-based dosing schedules tailored to your biology.' : '停止盲目服用补剂。获取基于科学的、为您量身定制的服用计划。';
+  const regH3 = document.querySelector('#page-register h3');
+  if (regH3) regH3.textContent = isEN ? 'Create your account' : '创建账户';
+  document.querySelector('#page-register label[for=regUser]').textContent = isEN ? 'Username' : '用户名';
+  document.getElementById('regUser').placeholder = isEN ? 'Choose a username' : '输入用户名';
+  document.querySelector('#page-register label[for=regPass]').textContent = isEN ? 'Password' : '密码';
+  document.getElementById('regPass').placeholder = isEN ? 'At least 6 characters' : '至少6个字符';
+  document.getElementById('regBtn').textContent = isEN ? 'Create Account' : '创建账户';
+
+  // Login page
+  const loginTitle = document.querySelector('#page-login h1');
+  if (loginTitle) loginTitle.textContent = isEN ? 'Welcome back' : '欢迎回来';
+  const loginSub = document.querySelector('#page-login .subtitle');
+  if (loginSub) loginSub.textContent = isEN ? 'Sign in to view your daily supplement schedule.' : '登录查看您的每日补剂服用计划。';
+  const loginH3 = document.querySelector('#page-login h3');
+  if (loginH3) loginH3.textContent = isEN ? 'Sign in' : '登录';
+  const loginUserLabel = document.querySelector('#page-login label[for=loginUser]');
+  if (loginUserLabel) loginUserLabel.textContent = isEN ? 'Username' : '用户名';
+  document.getElementById('loginUser').placeholder = isEN ? 'Your username' : '输入用户名';
+  const loginPassLabel = document.querySelector('#page-login label[for=loginPass]');
+  if (loginPassLabel) loginPassLabel.textContent = isEN ? 'Password' : '密码';
+  document.getElementById('loginPass').placeholder = isEN ? 'Your password' : '输入密码';
+  const loginBtn = document.querySelector('#page-login .btn-primary');
+  if (loginBtn) loginBtn.textContent = isEN ? 'Sign In' : '登录';
+
+  // Onboarding page
+  const onbTitle = document.querySelector('#page-onboard-intro h2');
+  if (onbTitle) onbTitle.textContent = isEN ? 'One more step' : '最后一步';
+  const onbSub = document.querySelector('#page-onboard-intro .body-sm');
+  if (onbSub) onbSub.textContent = isEN ? 'Tell us about your health goals so we can build your personalized supplement plan. We use your age and gender to match US and Japan dietary standards.' : '告诉我们您的健康目标，我们将为您构建个性化的补剂计划。我们会根据您的年龄和性别，匹配美国和日本的膳食标准。';
+  const onbBirthLabel = document.querySelector('#page-onboard-intro label[for=onbBirth]');
+  if (onbBirthLabel) onbBirthLabel.textContent = isEN ? 'Birth Date *' : '出生日期 *';
+  const onbGenderLabel = document.querySelector('#page-onboard-intro label[for=onbGender]');
+  if (onbGenderLabel) onbGenderLabel.textContent = isEN ? 'Gender *' : '性别 *';
+  const onbGenderSelect = document.getElementById('onbGender');
+  if (onbGenderSelect) {
+    onbGenderSelect.options[0].textContent = isEN ? 'Select...' : '请选择...';
+    onbGenderSelect.options[1].textContent = isEN ? 'Male' : '男';
+    onbGenderSelect.options[2].textContent = isEN ? 'Female' : '女';
+    onbGenderSelect.options[3].textContent = isEN ? 'Other' : '其他';
+  }
+  const onbHLabel = document.querySelector('#page-onboard-intro label[for=onbHeight]');
+  if (onbHLabel) onbHLabel.textContent = isEN ? 'Height (cm)' : '身高 (cm)';
+  const onbWLabel = document.querySelector('#page-onboard-intro label[for=onbWeight]');
+  if (onbWLabel) onbWLabel.textContent = isEN ? 'Weight (kg)' : '体重 (kg)';
+  const onbRawLabel = document.querySelector('#page-onboard-intro label[for=onbRawText]');
+  if (onbRawLabel) onbRawLabel.textContent = isEN ? 'What do you want to improve? *' : '您想改善哪些健康问题？ *';
+  document.getElementById('onbRawText').placeholder = isEN ? 'e.g. I have type 2 diabetes and high blood pressure. My joints hurt and I have trouble sleeping.' : '例如：我有2型糖尿病和高血压，关节疼，还总是睡不好。';
+  const onbBtn = document.querySelector('#page-onboard-intro .btn-primary');
+  if (onbBtn) onbBtn.textContent = isEN ? 'Analyze & Generate My Plan' : 'AI 分析并生成我的计划';
+
+  // Dashboard
+  const dashGreeting = document.getElementById('dashGreeting');
+  if (dashGreeting && dashGreeting.textContent.includes('我的仪表盘')) dashGreeting.textContent = isEN ? 'Your Dashboard' : '我的仪表盘';
+  if (dashGreeting && dashGreeting.textContent.includes('Your Dashboard')) dashGreeting.textContent = isEN ? 'Your Dashboard' : '我的仪表盘';
+  const dashBtns = document.querySelectorAll('#page-dashboard .btn-secondary, #page-dashboard .btn-primary');
+  if (dashBtns.length >= 2) {
+    dashBtns[0].textContent = isEN ? 'Refresh Plan' : '刷新计划';
+    dashBtns[1].textContent = isEN ? '+ Import Supplement' : '+ 导入补剂';
+  }
+  // Dashboard card titles
+  const dashCards = document.querySelectorAll('#page-dashboard h3');
+  if (dashCards.length >= 3) {
+    dashCards[0].textContent = isEN ? 'Daily Element Intake' : '每日元素摄入';
+    dashCards[1].textContent = isEN ? "Today's Schedule" : '今日服药计划';
+    dashCards[2].textContent = isEN ? 'Your Supplements' : '我的补剂';
+  }
+  // Dashboard empty states
+  const emptyStates = document.querySelectorAll('#page-dashboard .caption');
+  if (emptyStates.length >= 3) {
+    emptyStates[0].textContent = isEN ? 'No supplements yet. Import your first supplement to get started.' : '还没有补剂。导入您的第一个补剂以查看进度。';
+    emptyStates[1].textContent = isEN ? 'No schedule generated. Import supplements to create your daily plan.' : '尚未生成服药计划。导入补剂以创建您的每日计划。';
+    emptyStates[2].textContent = isEN ? 'No supplements in your inventory.' : '库存中没有补剂。';
+  }
+
+  // OCR page
+  const ocrTitle = document.querySelector('#page-ocr-import h2');
+  if (ocrTitle) ocrTitle.textContent = isEN ? 'Import Supplement' : '导入补剂';
+  const ocrSub = document.querySelector('#page-ocr-import .body-sm');
+  if (ocrSub) ocrSub.textContent = isEN ? 'Upload a photo of the supplement nutrition label. MIMO v2.5 Pro will extract all ingredients automatically.' : '上传补剂营养成分标签的照片。MIMO v2.5 Pro 将自动提取所有成分信息。';
+  const ocrZone = document.querySelector('#uploadZone .body-sm');
+  if (ocrZone) ocrZone.textContent = isEN ? 'Tap to take a photo or choose a file' : '点击拍照或选择补剂标签照片';
+  const ocrCap = document.querySelector('#uploadZone .caption');
+  if (ocrCap) ocrCap.textContent = isEN ? 'JPEG, PNG, GIF, WebP -- max 10MB' : 'JPEG, PNG, GIF, WebP -- 最大10MB';
+  const dosageLabel = document.querySelector('#page-ocr-import label[for=ocrDosage]');
+  if (dosageLabel) dosageLabel.textContent = isEN ? 'Dosage per day' : '每日服用量';
+  const ocrBtn = document.getElementById('ocrImportBtn');
+  if (ocrBtn) ocrBtn.textContent = isEN ? 'Analyze & Import' : 'AI 分析并导入';
+  const cancelBtn = document.querySelector('#page-ocr-import .btn-secondary');
+  if (cancelBtn) cancelBtn.textContent = isEN ? 'Cancel' : '取消';
 }
 
 // ============================================================

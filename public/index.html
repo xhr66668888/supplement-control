@@ -179,14 +179,14 @@
     </div>
     <div class="nav-right" id="navRight">
       <button class="btn btn-tertiary btn-sm" id="langToggle" onclick="toggleLang()" aria-label="Switch language">EN</button>
-      <a href="#" class="btn btn-tertiary btn-sm" id="navSignIn" onclick="showPage('login')">Sign In</a>
-      <a href="#" class="btn btn-primary btn-sm" id="navGetStarted" onclick="showPage('register')">Get Started</a>
+      <a href="#" class="btn btn-tertiary btn-sm" id="navSignIn" onclick="showPage('login')">登录</a>
+      <a href="#" class="btn btn-primary btn-sm" id="navGetStarted" onclick="showPage('register')">注册</a>
     </div>
     <div class="nav-right" id="navAuth" style="display:none;">
       <span class="body-sm" id="navUsername"></span>
       <button class="btn btn-tertiary btn-sm" id="langToggleAuth" onclick="toggleLang()" aria-label="Switch language">EN</button>
-      <a href="#" class="btn btn-secondary btn-sm" id="navRefresh" onclick="refreshDashboard()">Refresh</a>
-      <a href="#" class="btn btn-tertiary btn-sm" id="navSignOut" onclick="logout()">Sign Out</a>
+      <a href="#" class="btn btn-secondary btn-sm" id="navRefresh" onclick="refreshDashboard()">刷新</a>
+      <a href="#" class="btn btn-tertiary btn-sm" id="navSignOut" onclick="logout()">退出</a>
     </div>
   </nav>
 
@@ -200,14 +200,14 @@
   <!-- REGISTER -->
   <div class="page" id="page-register">
     <div class="auth-hero">
-      <h1>Personalized supplement intelligence</h1>
-      <p class="subtitle">Stop taking supplements blindly. Get science-based dosing schedules tailored to your biology.</p>
+      <h1>个性化补剂智能管理</h1>
+      <p class="subtitle">停止盲目服用补剂。获取基于科学的、为您量身定制的服用计划。</p>
       <div class="card auth-card w-full">
-        <h3 class="mb-base">Create your account</h3>
-        <div class="input-group"><label for="regUser">Username</label><input class="input" id="regUser" aria-label="Username" placeholder="Choose a username" autocomplete="username"><div class="field-error" id="regUserErr"></div></div>
-        <div class="input-group"><label for="regPass">Password</label><input class="input" type="password" id="regPass" aria-label="Password" placeholder="At least 6 characters" autocomplete="new-password" minlength="6"><div class="field-error" id="regPassErr"></div></div>
-        <button class="btn btn-primary w-full mt-sm" id="regBtn" onclick="doRegister()">Create Account</button>
-        <p class="caption text-center mt-base">Already have an account? <a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('login')">Sign in</a></p>
+        <h3 class="mb-base">创建账户</h3>
+        <div class="input-group"><label for="regUser">用户名</label><input class="input" id="regUser" aria-label="用户名" placeholder="输入用户名" autocomplete="username"><div class="field-error" id="regUserErr"></div></div>
+        <div class="input-group"><label for="regPass">密码</label><input class="input" type="password" id="regPass" aria-label="密码" placeholder="至少6个字符" autocomplete="new-password" minlength="6"><div class="field-error" id="regPassErr"></div></div>
+        <button class="btn btn-primary w-full mt-sm" id="regBtn" onclick="doRegister()">创建账户</button>
+        <p class="caption text-center mt-base">已有账户？<a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('login')">登录</a></p>
       </div>
     </div>
   </div>
@@ -215,14 +215,14 @@
   <!-- LOGIN -->
   <div id="page-login" class="page">
     <div class="auth-hero">
-      <h1>Welcome back</h1>
-      <p class="subtitle">Sign in to view your daily supplement schedule.</p>
+      <h1>欢迎回来</h1>
+      <p class="subtitle">登录查看您的每日补剂服用计划。</p>
       <div class="card auth-card w-full">
-        <h3 class="mb-base">Sign in</h3>
-        <div class="input-group"><label for="loginUser">Username</label><input class="input" id="loginUser" aria-label="Username" placeholder="Your username" autocomplete="username"></div>
-        <div class="input-group"><label for="loginPass">Password</label><input class="input" type="password" id="loginPass" aria-label="Password" placeholder="Your password" autocomplete="current-password"></div>
-        <button class="btn btn-primary w-full mt-sm" onclick="doLogin()">Sign In</button>
-        <p class="caption text-center mt-base">Don't have an account? <a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('register')">Create one</a></p>
+        <h3 class="mb-base">登录</h3>
+        <div class="input-group"><label for="loginUser">用户名</label><input class="input" id="loginUser" aria-label="用户名" placeholder="输入用户名" autocomplete="username"></div>
+        <div class="input-group"><label for="loginPass">密码</label><input class="input" type="password" id="loginPass" aria-label="密码" placeholder="输入密码" autocomplete="current-password"></div>
+        <button class="btn btn-primary w-full mt-sm" onclick="doLogin()">登录</button>
+        <p class="caption text-center mt-base">还没有账户？<a href="#" style="color:var(--primary);text-decoration:none;" onclick="showPage('register')">创建一个</a></p>
       </div>
     </div>
   </div>
@@ -230,17 +230,17 @@
   <!-- ONBOARDING INTERSTITIAL (after register, before profile) -->
   <div id="page-onboard-intro" class="page">
     <section><div class="container" style="max-width:560px;margin:0 auto;text-align:center;">
-      <h2 class="mb-sm">One more step</h2>
-      <p class="body-sm mb-lg">Tell us about your health goals so we can build your personalized supplement plan. We use your age and gender to match US and Japan dietary standards.</p>
+      <h2 class="mb-sm">最后一步</h2>
+      <p class="body-sm mb-lg">告诉我们您的健康目标，我们将为您构建个性化的补剂计划。我们会根据您的年龄和性别，匹配美国和日本的膳食标准。</p>
       <div class="card" style="text-align:left;">
-        <div class="input-group"><label for="onbBirth">Birth Date *</label><input class="input" type="date" id="onbBirth" aria-label="Birth date"><div class="field-error" id="onbBirthErr"></div></div>
-        <div class="input-group"><label for="onbGender">Gender *</label><select class="input" id="onbGender" aria-label="Gender"><option value="">Select...</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select><div class="field-error" id="onbGenderErr"></div></div>
+        <div class="input-group"><label for="onbBirth">出生日期 *</label><input class="input" type="date" id="onbBirth" aria-label="出生日期"><div class="field-error" id="onbBirthErr"></div></div>
+        <div class="input-group"><label for="onbGender">性别 *</label><select class="input" id="onbGender" aria-label="性别"><option value="">请选择...</option><option value="male">男</option><option value="female">女</option><option value="other">其他</option></select><div class="field-error" id="onbGenderErr"></div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="input-group"><label for="onbHeight">Height (cm)</label><input class="input" type="number" id="onbHeight" aria-label="Height" placeholder="178"></div>
-          <div class="input-group"><label for="onbWeight">Weight (kg)</label><input class="input" type="number" id="onbWeight" aria-label="Weight" placeholder="82"></div>
+          <div class="input-group"><label for="onbHeight">身高 (cm)</label><input class="input" type="number" id="onbHeight" aria-label="身高" placeholder="178"></div>
+          <div class="input-group"><label for="onbWeight">体重 (kg)</label><input class="input" type="number" id="onbWeight" aria-label="体重" placeholder="82"></div>
         </div>
-        <div class="input-group"><label for="onbRawText">What do you want to improve? *</label><textarea class="input" id="onbRawText" aria-label="Health description" placeholder="e.g. I have type 2 diabetes and high blood pressure. My joints hurt and I have trouble sleeping."></textarea><div class="field-error" id="onbRawTextErr"></div></div>
-        <button class="btn btn-primary btn-lg w-full" onclick="doOnboard()">Analyze & Generate My Plan</button>
+        <div class="input-group"><label for="onbRawText">您想改善哪些健康问题？ *</label><textarea class="input" id="onbRawText" aria-label="健康描述" placeholder="例如：我有2型糖尿病和高血压，关节疼，还总是睡不好。"></textarea><div class="field-error" id="onbRawTextErr"></div></div>
+        <button class="btn btn-primary btn-lg w-full" onclick="doOnboard()">AI 分析并生成我的计划</button>
       </div>
     </div></section>
   </div>
@@ -251,12 +251,12 @@
       <div class="container">
         <div class="flex justify-between items-center flex-wrap mb-lg" style="gap:12px;">
           <div>
-            <h2 id="dashGreeting">Your Dashboard</h2>
+            <h2 id="dashGreeting">我的仪表盘</h2>
             <p class="body-sm" id="dashAgeInfo"></p>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">Refresh Plan</button>
-            <button class="btn btn-primary btn-sm" onclick="showPage('ocr-import')">+ Import Supplement</button>
+            <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">刷新计划</button>
+            <button class="btn btn-primary btn-sm" onclick="showPage('ocr-import')">+ 导入补剂</button>
           </div>
         </div>
 
@@ -267,18 +267,18 @@
 
         <div class="dash-grid">
           <div class="card">
-            <h3 class="mb-base">Daily Element Intake</h3>
-            <div id="progressContainer"><p class="caption">No supplements yet. Import your first supplement to see progress.</p></div>
+            <h3 class="mb-base">每日元素摄入</h3>
+            <div id="progressContainer"><p class="caption">还没有补剂。导入您的第一个补剂以查看进度。</p></div>
           </div>
           <div class="card">
-            <h3 class="mb-base">Today's Schedule</h3>
-            <div id="scheduleContainer"><p class="caption">No schedule generated. Import supplements to create your daily plan.</p></div>
+            <h3 class="mb-base">今日服药计划</h3>
+            <div id="scheduleContainer"><p class="caption">尚未生成服药计划。导入补剂以创建您的每日计划。</p></div>
           </div>
         </div>
 
         <div class="card mt-lg">
-          <h3 class="mb-base">Your Supplements</h3>
-          <div id="inventoryContainer"><p class="caption">No supplements in your inventory.</p></div>
+          <h3 class="mb-base">我的补剂</h3>
+          <div id="inventoryContainer"><p class="caption">库存中没有补剂。</p></div>
         </div>
       </div>
     </section>
@@ -288,19 +288,19 @@
   <div id="page-ocr-import" class="page">
     <section>
       <div class="container" style="max-width:640px;margin:0 auto;">
-        <h2 class="mb-sm">Import Supplement</h2>
-        <p class="body-sm mb-lg">Upload a photo of the supplement nutrition label. MIMO v2.5 Pro will extract all ingredients automatically.</p>
+        <h2 class="mb-sm">导入补剂</h2>
+        <p class="body-sm mb-lg">上传补剂营养成分标签的照片。MIMO v2.5 Pro 将自动提取所有成分信息。</p>
         <div class="card">
-          <div class="upload-zone" id="uploadZone" role="button" aria-label="Upload supplement label photo" tabindex="0">
-            <p class="body-sm">Tap to take a photo or choose a file</p>
-            <p class="caption" style="margin-top:4px;">JPEG, PNG, GIF, WebP -- max 10MB</p>
+          <div class="upload-zone" id="uploadZone" role="button" aria-label="上传补剂标签照片" tabindex="0">
+            <p class="body-sm">点击拍照或选择补剂标签照片</p>
+            <p class="caption" style="margin-top:4px;">JPEG, PNG, GIF, WebP -- 最大10MB</p>
             <input type="file" id="ocrFileInput" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp" capture="environment" aria-label="Upload supplement label image">
             <img class="preview-img" id="ocrPreview" alt="Label preview">
           </div>
           <div class="upload-actions">
-            <div class="input-group" style="margin-bottom:0;flex:1;min-width:120px;"><label>Dosage per day</label><input class="input" type="number" id="ocrDosage" value="1" min="1" max="20" aria-label="Dosage per day" style="text-align:center;"></div>
-            <button class="btn btn-primary" id="ocrImportBtn" disabled style="margin-top:22px;">Analyze & Import</button>
-            <button class="btn btn-secondary" style="margin-top:22px;" onclick="showPage('dashboard')">Cancel</button>
+            <div class="input-group" style="margin-bottom:0;flex:1;min-width:120px;"><label>每日服用量</label><input class="input" type="number" id="ocrDosage" value="1" min="1" max="20" aria-label="每日服用量" style="text-align:center;"></div>
+            <button class="btn btn-primary" id="ocrImportBtn" disabled style="margin-top:22px;">AI 分析并导入</button>
+            <button class="btn btn-secondary" style="margin-top:22px;" onclick="showPage('dashboard')">取消</button>
           </div>
           <p class="caption mt-sm" id="ocrStatus" role="status"></p>
           <div id="ocrReviewPanel" style="display:none;margin-top:16px;"></div>
