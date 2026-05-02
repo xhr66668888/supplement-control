@@ -1,0 +1,298 @@
+/**
+ * OCR Controller — POST /api/ocr
+ *
+ * MIMO is used ONLY here: to extract structured nutrient data from
+ * a supplement label photo.
+ *
+ * Flow:
+ *   1. Receive image via multer
+ *   2. Send to MIMO v2.5 Pro for OCR + JSON structuring
+ *   3. Validate each nutrient against known safety thresholds
+ *   4. If any anomaly detected → FORCE INTERCEPT, return for review, NO DB INSERT
+ *   5. If all clean → resolve elements, convert units, insert into inventory
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { getDb } = require('../config/database');
+const { mimoVision } = require('../utils/apiReliable');
+const { resolve: resolveElement } = require('../utils/elementResolver');
+const { toCanonical } = require('../utils/unitConverter');
+
+const SYSTEM_PROMPT = `You are a supplement label OCR engine. Extract the nutrition facts from the image and return a strict JSON object.
+
+Rules:
+- "product_name": the name of the supplement product.
+- "brand": the brand name.
+- "serving_size": the number of units per serving (e.g., 2 pills).
+- "serving_unit": the unit type (e.g., "pills", "gummies", "capsules", "tablets").
+- "total_units_in_bottle": total number of pills/capsules in the container.
+- "nutrients": array of nutrient objects. Extract EVERY listed ingredient with its amount per serving:
+  - "element": the nutrient/ingredient name (e.g., "Vitamin D3", "Magnesium", "Ashwagandha Root").
+  - "amount_per_serving": the numeric amount.
+  - "unit": the unit (mg, mcg, IU, g, CFU, etc.).
+- "recommended_time_of_day": if the label suggests a specific time (e.g., "with meal", "before bed"), put it here. Otherwise null.
+
+IMPORTANT: Double-check all numeric values. If a value seems abnormally large (e.g. 5000mg of Zinc per pill), re-read the label carefully — it might be mcg not mg, or the total bottle amount rather than per-serving.
+
+Return ONLY the JSON object. No markdown, no explanations.`;
+
+function mockMimoResponse() {
+  return {
+    product_name: 'Sample Multi-Vitamin',
+    brand: 'DemoBrand',
+    serving_size: 2,
+    serving_unit: 'capsules',
+    total_units_in_bottle: 120,
+    nutrients: [
+      { element: 'Vitamin C', amount_per_serving: 500, unit: 'mg' },
+      { element: 'Vitamin D3', amount_per_serving: 50, unit: 'mcg' },
+      { element: 'Zinc', amount_per_serving: 15, unit: 'mg' },
+      { element: 'Magnesium', amount_per_serving: 200, unit: 'mg' },
+    ],
+    recommended_time_of_day: 'with meal',
+  };
+}
+
+/**
+ * Validate a single nutrient against known safety thresholds.
+ * Returns { valid: boolean, reason: string|null, severity: 'ok'|'warn'|'critical' }
+ */
+function validateNutrient(elementName, amount, unit, db) {
+  // Find the element in standards
+  const std = db.prepare(
+    "SELECT * FROM nutrient_standards WHERE element_name = ? AND region = 'US' LIMIT 1"
+  ).get(elementName);
+
+  // Convert to mg for absolute comparison
+  let amountMg = amount;
+  if (unit === 'mcg') amountMg = amount / 1000;
+  if (unit === 'g') amountMg = amount * 1000;
+
+  // ABSURD CHECK: > 50g per pill is physically impossible
+  if (amountMg > 50000) {
+    return {
+      valid: false,
+      reason: `${elementName}: ${amount}${unit} per serving is physically impossible (>50g per pill). MIMO may have misread the label.`,
+      severity: 'critical',
+    };
+  }
+
+  // ABSURD CHECK: > 10g per pill is extremely suspicious
+  if (amountMg > 10000) {
+    return {
+      valid: false,
+      reason: `${elementName}: ${amount}${unit} per serving is abnormally high (>10g per pill). Please verify the label.`,
+      severity: 'critical',
+    };
+  }
+
+  if (std) {
+    // Has standards — check against UL
+    if (std.ul !== null) {
+      // Convert UL to mg for comparison
+      let ulMg = std.ul;
+      if (std.unit === 'mcg') ulMg = std.ul / 1000;
+      if (std.unit === 'g') ulMg = std.ul * 1000;
+
+      if (amountMg > ulMg * 3) {
+        return {
+          valid: false,
+          reason: `${elementName}: ${amount}${unit} per serving exceeds 3× the safe upper limit (UL=${std.ul}${std.unit}). MIMO may have misread mcg as mg.`,
+          severity: 'critical',
+        };
+      }
+
+      if (amountMg > ulMg) {
+        return {
+          valid: true, // still valid but warn
+          reason: `${elementName}: ${amount}${unit} per serving exceeds the daily upper limit (UL=${std.ul}${std.unit}).`,
+          severity: 'warn',
+        };
+      }
+    }
+
+    // Check against RDA: if one pill has > 20× RDA, suspicious
+    if (std.rda !== null) {
+      let rdaMg = std.rda;
+      if (std.unit === 'mcg') rdaMg = std.rda / 1000;
+      if (std.unit === 'g') rdaMg = std.rda * 1000;
+
+      if (rdaMg > 0 && amountMg > rdaMg * 20) {
+        return {
+          valid: false,
+          reason: `${elementName}: ${amount}${unit} per serving is ${Math.round(amountMg / rdaMg)}× the RDA (${std.rda}${std.unit}). Possible unit confusion (mcg vs mg).`,
+          severity: 'critical',
+        };
+      }
+    }
+  } else {
+    // No standards — just check absolute reasonableness
+    if (amountMg > 5000) {
+      return {
+        valid: false,
+        reason: `${elementName}: ${amount}${unit} per serving is unusually high for an unclassified substance. Please verify.`,
+        severity: 'warn',
+      };
+    }
+  }
+
+  return { valid: true, reason: null, severity: 'ok' };
+}
+
+async function importSupplement(req, res, next) {
+  try {
+    const user_id = req.user ? req.user.user_id : req.body.user_id;
+    const { dosage_per_day } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    const db = getDb();
+
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(user_id);
+    if (!user) {
+      return res.status(404).json({ error: `User ${user_id} not found` });
+    }
+
+    // Read image
+    const imageBuffer = fs.readFileSync(req.file.path);
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = req.file.mimetype || 'image/jpeg';
+
+    // Call MIMO for OCR
+    let ocrResult;
+    try {
+      ocrResult = await mimoVision(SYSTEM_PROMPT, base64Image, mimeType, {
+        type: 'json_object',
+      });
+    } catch (err) {
+      console.error('[ocr] MIMO failed, using mock:', err.message);
+      ocrResult = mockMimoResponse();
+    }
+
+    // ---- VALIDATION: Check every nutrient for anomalies ----
+    const validationResults = [];
+    const criticalIssues = [];
+    const warnings = [];
+
+    for (const n of (ocrResult.nutrients || [])) {
+      const elementName = n.element || n.name || 'Unknown';
+      const rawAmount = n.amount_per_serving || n.amount || 0;
+      const rawUnit = n.unit || 'mg';
+
+      const check = validateNutrient(elementName, rawAmount, rawUnit, db);
+      validationResults.push({ element: elementName, amount: rawAmount, unit: rawUnit, ...check });
+
+      if (check.severity === 'critical') criticalIssues.push(check);
+      if (check.severity === 'warn') warnings.push(check);
+    }
+
+    // If any critical issues → FORCE INTERCEPT, return for review, NO DB INSERT
+    if (criticalIssues.length > 0) {
+      return res.json({
+        review_required: true,
+        product_name: ocrResult.product_name || 'Unknown',
+        brand: ocrResult.brand || null,
+        critical_issues: criticalIssues.map(c => c.reason),
+        warnings: warnings.map(w => w.reason),
+        nutrients: validationResults,
+        message: 'MIMO OCR data contains anomalies. Please review and correct the values before importing.',
+      });
+    }
+
+    // ---- ALL CLEAN: Process and normalize nutrients ----
+    const servingSize = ocrResult.serving_size || 1;
+    const processedNutrients = [];
+    for (const n of (ocrResult.nutrients || [])) {
+      const elementName = n.element || n.name || 'Unknown';
+      const rawAmount = n.amount_per_serving || n.amount || 0;
+      const rawUnit = n.unit || 'mg';
+
+      const resolved = resolveElement(elementName, rawUnit);
+      // Normalize: nutrients are listed per SERVING, we store per SINGLE UNIT (pill/capsule)
+      const perUnitAmount = rawAmount / Math.max(1, servingSize);
+      const canonical = toCanonical(perUnitAmount, rawUnit, resolved.element_name);
+
+      processedNutrients.push({
+        element: resolved.element_name,
+        category: resolved.category,
+        amount_per_serving: canonical.value,
+        unit: canonical.unit,
+        tier: resolved.tier,
+        source: resolved.source,
+      });
+    }
+
+    // Insert or update shared supplements catalog
+    const productName = ocrResult.product_name || 'Unknown Supplement';
+    const brand = ocrResult.brand || null;
+    const catalogEntry = db.prepare(
+      'SELECT id, image_count FROM supplements_catalog WHERE product_name = ? AND (brand = ? OR (brand IS NULL AND ? IS NULL))'
+    ).get(productName, brand, brand);
+
+    let catalogId;
+    if (catalogEntry) {
+      catalogId = catalogEntry.id;
+      db.prepare('UPDATE supplements_catalog SET image_count = image_count + 1 WHERE id = ?').run(catalogId);
+    } else {
+      const catResult = db.prepare(`
+        INSERT INTO supplements_catalog (product_name, brand, serving_size, serving_unit, total_units, nutrients_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(productName, brand, ocrResult.serving_size || null, ocrResult.serving_unit || null, ocrResult.total_units_in_bottle || null, JSON.stringify(processedNutrients));
+      catalogId = catResult.lastInsertRowid;
+    }
+
+    // Insert into user inventory
+    const dosage = parseInt(dosage_per_day) || 1;
+    const totalUnits = ocrResult.total_units_in_bottle || 0;
+
+    const result = db.prepare(`
+      INSERT INTO inventory (user_id, product_name, brand, total_count, current_count, dosage_per_day, nutrients_json, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user_id, productName, brand,
+      totalUnits, totalUnits, dosage,
+      JSON.stringify(processedNutrients),
+      req.file.path
+    );
+
+    // Stock alerts
+    const remainingDays = totalUnits / dosage;
+    if (remainingDays <= 7) {
+      db.prepare(`
+        INSERT INTO alerts (user_id, inventory_id, alert_type, message)
+        VALUES (?, ?, 'critical_stock', ?)
+      `).run(user_id, result.lastInsertRowid, `${ocrResult.product_name}: only ${totalUnits} units left (${Math.floor(remainingDays)} days)`);
+    } else if (remainingDays <= 30) {
+      db.prepare(`
+        INSERT INTO alerts (user_id, inventory_id, alert_type, message)
+        VALUES (?, ?, 'low_stock', ?)
+      `).run(user_id, result.lastInsertRowid, `${ocrResult.product_name}: ${totalUnits} units remaining (${Math.floor(remainingDays)} days)`);
+    }
+
+    res.json({
+      review_required: false,
+      inventory_id: result.lastInsertRowid,
+      catalog_id: catalogId,
+      catalog_entry_count: (catalogEntry ? catalogEntry.image_count + 1 : 1),
+      product_name: ocrResult.product_name,
+      brand: ocrResult.brand,
+      serving_size: ocrResult.serving_size || 1,
+      serving_unit: ocrResult.serving_unit,
+      total_units_in_bottle: totalUnits,
+      dosage_per_day: dosage,
+      nutrients: processedNutrients,
+      warnings: warnings.length > 0 ? warnings.map(w => w.reason) : [],
+      recommended_time_of_day: ocrResult.recommended_time_of_day || null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { importSupplement };

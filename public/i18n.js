@@ -1,0 +1,226 @@
+// Bio-Nutrient Manager i18n — Chinese/English dictionary
+const I18N = (() => {
+  const dict = {
+    zh: {
+      nav: { brand: '生物营养管理器', signIn: '登录', getStarted: '注册', refresh: '刷新', signOut: '退出', back: '返回' },
+      auth: {
+        createTitle: '个性化补剂智能管理',
+        createSubtitle: '停止盲目服用补剂。获取基于科学的、为您量身定制的服用计划。',
+        createAccount: '创建账户',
+        username: '用户名',
+        password: '密码',
+        passwordHint: '至少6个字符',
+        createBtn: '创建账户',
+        hasAccount: '已有账户？',
+        signIn: '登录',
+        welcomeTitle: '欢迎回来',
+        welcomeSubtitle: '登录查看您的每日补剂服用计划。',
+        signInTitle: '登录',
+        signInBtn: '登录',
+        noAccount: '还没有账户？',
+        createOne: '创建一个',
+      },
+      onboardIntro: {
+        title: '最后一步',
+        subtitle: '告诉我们您的健康目标，我们将为您构建个性化的补剂计划。我们会根据您的年龄和性别，匹配美国和日本的膳食标准。',
+        birthDate: '出生日期 *',
+        gender: '性别 *',
+        genderOptions: { '': '请选择...', male: '男', female: '女', other: '其他' },
+        height: '身高 (cm)',
+        weight: '体重 (kg)',
+        healthDesc: '您想改善哪些健康问题？ *',
+        healthPlaceholder: '例如：我有2型糖尿病和高血压，关节疼，还总是睡不好。',
+        analyzeBtn: 'AI 分析并生成我的计划',
+      },
+      dashboard: {
+        greeting: '你好',
+        ageInfo: '{gender}, {age}岁 | {atc}',
+        noConditions: '未记录健康状况',
+        refreshPlan: '刷新计划',
+        importSupplement: '+ 导入补剂',
+        recommendations: '您的个性化推荐',
+        recBased: '根据您的健康档案，我们推荐含有以下营养素的补剂：',
+        recImport: '使用上方按钮导入您的第一个补剂，开始追踪每日摄入量。',
+        elementIntake: '每日元素摄入',
+        noSupplements: '还没有补剂。导入您的第一个补剂以查看进度。',
+        todaySchedule: '今日服药计划',
+        noSchedule: '尚未生成服药计划。导入补剂以创建您的每日计划。',
+        yourSupplements: '您的补剂',
+        noInventory: '库存中没有补剂。',
+        unitsLeft: '剩余 {count} 粒',
+        days: '{days}天',
+      },
+      schedule: {
+        morningEmpty: '早晨空腹',
+        withMeal: '随餐服用',
+        afterLunch: '午饭后',
+        beforeBed: '睡前',
+        pill: '粒',
+        pills: '粒',
+      },
+      progress: {
+        rdaAvailable: '有RDA标准',
+        noRDA: '无RDA/UL标准',
+        unverified: '未验证元素',
+        aboveUL: '超过安全上限',
+        adequate: '已达标',
+        onTrack: '正常',
+        low: '偏低',
+        noData: '无数据',
+      },
+      ocr: {
+        title: '导入补剂',
+        subtitle: '上传补剂营养成分标签的照片。MIMO v2.5 Pro 将自动提取所有成分信息。',
+        uploadHint: '点击拍照或选择补剂标签照片',
+        uploadFormats: 'JPEG, PNG, GIF, WebP -- 最大10MB',
+        dosageLabel: '每日服用量',
+        analyzeBtn: 'AI 分析并导入',
+        cancel: '取消',
+        processing: 'MIMO v2.5 Pro 正在读取标签（约10-30秒）...',
+        imported: '已导入：{name}（{count}种营养素）。目录编号 #{catalogId}。',
+        reviewRequired: '需要复核',
+        reviewMsg: 'MIMO 检测到可能的异常值：',
+        notSaved: '这些数据未保存。请重新上传或手动核实。',
+        blocked: '导入已阻止 -- 检测到数据异常。',
+        failed: '导入失败：{error}',
+      },
+      alerts: {
+        criticalStock: '{name}：仅剩 {count} 粒（{days}天）-- 立即补货',
+        lowStock: '{name}：剩余 {count} 粒（{days}天）-- 库存偏低',
+        dismiss: '忽略',
+      },
+      inventory: {
+        critical: '告急',
+        low: '偏低',
+        ok: '正常',
+      },
+      toast: {
+        doseTaken: '已记录服用。',
+        undo: '撤销',
+      },
+      emptyRec: '标准条件：',
+      langLabel: 'EN',
+    },
+    en: {
+      nav: { brand: 'Bio-Nutrient Manager', signIn: 'Sign In', getStarted: 'Get Started', refresh: 'Refresh', signOut: 'Sign Out', back: 'Back' },
+      auth: {
+        createTitle: 'Personalized supplement intelligence',
+        createSubtitle: 'Stop taking supplements blindly. Get science-based dosing schedules tailored to your biology.',
+        createAccount: 'Create your account',
+        username: 'Username',
+        password: 'Password',
+        passwordHint: 'At least 6 characters',
+        createBtn: 'Create Account',
+        hasAccount: 'Already have an account?',
+        signIn: 'Sign in',
+        welcomeTitle: 'Welcome back',
+        welcomeSubtitle: 'Sign in to view your daily supplement schedule.',
+        signInTitle: 'Sign in',
+        signInBtn: 'Sign In',
+        noAccount: "Don't have an account?",
+        createOne: 'Create one',
+      },
+      onboardIntro: {
+        title: 'One more step',
+        subtitle: 'Tell us about your health goals so we can build your personalized supplement plan. We use your age and gender to match US and Japan dietary standards.',
+        birthDate: 'Birth Date *',
+        gender: 'Gender *',
+        genderOptions: { '': 'Select...', male: 'Male', female: 'Female', other: 'Other' },
+        height: 'Height (cm)',
+        weight: 'Weight (kg)',
+        healthDesc: 'What do you want to improve? *',
+        healthPlaceholder: 'e.g. I have type 2 diabetes and high blood pressure. My joints hurt and I have trouble sleeping.',
+        analyzeBtn: 'Analyze & Generate My Plan',
+      },
+      dashboard: {
+        greeting: 'Hello',
+        ageInfo: '{gender}, age {age} | {atc}',
+        noConditions: 'No conditions recorded',
+        refreshPlan: 'Refresh Plan',
+        importSupplement: '+ Import Supplement',
+        recommendations: 'Your Personalized Recommendations',
+        recBased: 'Based on your health profile, we recommend supplements containing these nutrients:',
+        recImport: 'Import your first supplement using the button above to start tracking your daily intake.',
+        elementIntake: 'Daily Element Intake',
+        noSupplements: 'No supplements yet. Import your first supplement to get started.',
+        todaySchedule: "Today's Schedule",
+        noSchedule: 'No schedule generated. Import supplements to create your daily plan.',
+        yourSupplements: 'Your Supplements',
+        noInventory: 'No supplements in your inventory.',
+        unitsLeft: '{count} units left',
+        days: '{days}d',
+      },
+      schedule: {
+        morningEmpty: 'Morning (Empty Stomach)',
+        withMeal: 'With Meal',
+        afterLunch: 'After Lunch',
+        beforeBed: 'Before Bed',
+        pill: 'pill',
+        pills: 'pills',
+      },
+      progress: {
+        rdaAvailable: 'RDA available',
+        noRDA: 'No RDA/UL established',
+        unverified: 'Unverified element',
+        aboveUL: 'ABOVE SAFE LIMIT',
+        adequate: 'adequate',
+        onTrack: 'on track',
+        low: 'low',
+        noData: 'No data',
+      },
+      ocr: {
+        title: 'Import Supplement',
+        subtitle: 'Upload a photo of the supplement nutrition label. MIMO v2.5 Pro will extract all ingredients automatically.',
+        uploadHint: 'Tap to take a photo or choose a file',
+        uploadFormats: 'JPEG, PNG, GIF, WebP -- max 10MB',
+        dosageLabel: 'Dosage per day',
+        analyzeBtn: 'Analyze & Import',
+        cancel: 'Cancel',
+        processing: 'MIMO v2.5 Pro is reading your supplement label (10-30 seconds)...',
+        imported: 'Imported: {name} ({count} nutrients). Catalog entry #{catalogId}.',
+        reviewRequired: 'Review Required',
+        reviewMsg: 'MIMO detected potentially abnormal values:',
+        notSaved: 'These values were NOT saved. Please re-upload or verify manually.',
+        blocked: 'Import blocked -- data anomalies detected.',
+        failed: 'Import failed: {error}',
+      },
+      alerts: {
+        criticalStock: '{name}: only {count} units left ({days} days) -- REORDER NOW',
+        lowStock: '{name}: {count} units remaining ({days} days) -- running low',
+        dismiss: 'Dismiss',
+      },
+      inventory: {
+        critical: 'CRITICAL',
+        low: 'LOW',
+        ok: 'OK',
+      },
+      toast: {
+        doseTaken: 'Dose taken.',
+        undo: 'Undo',
+      },
+      emptyRec: 'Standardized conditions:',
+      langLabel: '中文',
+    },
+  };
+
+  let lang = localStorage.getItem('bnm_lang') || 'zh';
+
+  function t(key, vars) {
+    let s = key.split('.').reduce((o, k) => (o || {})[k], dict[lang]) || key;
+    if (vars) {
+      for (const [k, v] of Object.entries(vars)) {
+        s = s.replace(`{${k}}`, v);
+      }
+    }
+    return s;
+  }
+
+  function setLang(l) {
+    lang = l;
+    localStorage.setItem('bnm_lang', l);
+  }
+
+  function getLang() { return lang; }
+
+  return { t, setLang, getLang, dict };
+})();
